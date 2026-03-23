@@ -1,0 +1,27 @@
+name: release
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - run: python scripts/validate_skill.py
+      - run: python scripts/package_skill.py --version "${GITHUB_REF_NAME#v}"
+
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: "dist/*.zip"
+          generate_release_notes: true
