@@ -1,17 +1,39 @@
 # Example: Staged Workflow
 
-1. `tosea_parse_pdf` with a fresh `idempotency_key`
-2. `tosea_wait_for_job`
-3. `tosea_generate_outline`
-4. `tosea_wait_for_job`
-5. `tosea_edit_outline_page`
-6. `tosea_render_slides`
-7. `tosea_wait_for_job`
-8. `tosea_edit_slide_page`
-9. `tosea_export_presentation`
-10. `tosea_wait_for_job`
-11. Optional: `tosea_list_export_files`
+1. Parse with a fresh request key:
+
+```bash
+python scripts/make_idempotency_key.py --prefix parse
+python scripts/parse_pdf.py --file ./source.pdf --instruction "Create a 6-slide operating review." --render-model gemini-3.1-pro-preview --idempotency-key <idempotency_key>
+python scripts/wait_for_job.py --presentation-id <presentation_id>
+```
+
+2. Generate and revise outline:
+
+```bash
+python scripts/generate_outline.py --presentation-id <presentation_id> --instruction "Emphasize executive summary, risks, and owners."
+python scripts/wait_for_job.py --presentation-id <presentation_id>
+python scripts/make_idempotency_key.py --prefix outline-edit
+python scripts/edit_outline_page.py --presentation-id <presentation_id> --page-number 2 --action modify --instruction "Make this page a sharper executive summary." --idempotency-key <idempotency_key>
+```
+
+3. Render and revise slides:
+
+```bash
+python scripts/render_slides.py --presentation-id <presentation_id> --render-model gemini-3.1-pro-preview --force
+python scripts/wait_for_job.py --presentation-id <presentation_id>
+python scripts/make_idempotency_key.py --prefix slide-edit
+python scripts/edit_slide_page.py --presentation-id <presentation_id> --page-number 2 --action modify --instruction "Use a stronger title and fewer bullets." --edit-mode layout_only --idempotency-key <idempotency_key>
+```
+
+4. Export:
+
+```bash
+python scripts/make_idempotency_key.py --prefix xp
+python scripts/export_presentation.py --presentation-id <presentation_id> --output-format pptx --idempotency-key <idempotency_key>
+python scripts/wait_for_job.py --presentation-id <presentation_id> --download-to ./staged-output.pptx
+```
 
 Use this path when the user asks for outline changes, inserted slides, or iteration after review.
 
-For the export step, use nested `job.status` from the jobs payload when present.
+For the export step, use nested `data.job.status` from the jobs payload when present.

@@ -1,56 +1,78 @@
 # `slides-generation-skills`
 
-Official ToseaAI skill package for agentic document-to-presentation workflows.
+Official ToseaAI skill package for scripts-first document-to-presentation workflows.
 
-This repository is intentionally separate from the MCP server and the main ToseaAI application:
+This repository is intentionally separate from both the product backend and the optional MCP server:
 
-- the MCP server is an execution connector;
-- the skill is the workflow policy and operator guide;
-- the product backend remains the system of record for auth, billing, quota, and exports.
+- the backend remains the system of record for auth, billing, quota, storage, and exports
+- this repo provides `SKILL.md` plus local scripts that call `/api/mcp/v1`
+- the `mcp-ToseaAI` repository remains an optional transport for hosts that already support MCP well
 
 ## What this repo contains
 
-- `SKILL.md`: the operational instructions for the agent
-- `agents/openai.yaml`: lightweight metadata for OpenAI-compatible skill packaging
-- `references/`: compact reference docs
-- `examples/`: one-shot and staged workflow examples
+- `SKILL.md`: workflow policy for the agent
+- `scripts/`: thin Python entrypoints that call the public `/api/mcp/v1` HTTP contract
+- `references/`: compact notes on transport, billing, and endpoint mapping
+- `examples/`: one-shot and staged command examples
+- `agents/openai.yaml`: metadata for OpenAI-compatible skill packaging
 
-## Required runtime
+## Default runtime
 
-This skill assumes an MCP server named `tosea` is already configured and healthy.
+This skill is scripts-first. It does not require MCP.
 
-Recommended pairing:
-
-- MCP repo: `git@github.com:ToseaAI/mcp-ToseaAI.git`
-- Skill repo: `git@github.com:ToseaAI/slides-generation-skills.git`
-
-## Install
-
-For Codex-style local skills, place this repository under your local skills directory and keep the repository name stable, for example:
+Required environment variables:
 
 ```bash
-git clone git@github.com:ToseaAI/slides-generation-skills.git ~/.codex/skills/tosea-slides
+export TOSEA_API_KEY="sk_..."
+export TOSEA_API_BASE_URL="https://your-tosea-backend.example.com"
 ```
 
-For Claude Code style workflows, keep this repo next to your MCP config and load `SKILL.md` through your team's skill or project-instructions mechanism.
+Windows PowerShell:
 
-For Cursor, pair the MCP server with the guidance in `SKILL.md` by adapting the workflow rules into project rules or shared instructions.
+```powershell
+$env:TOSEA_API_KEY="sk_..."
+$env:TOSEA_API_BASE_URL="https://your-tosea-backend.example.com"
+```
+
+## Typical use
+
+Health check:
+
+```bash
+python scripts/health.py
+python scripts/get_permissions_summary.py
+python scripts/get_quota_status.py
+```
+
+One-shot:
+
+```bash
+python scripts/make_idempotency_key.py --prefix one-shot
+python scripts/pdf_to_presentation.py --file ./deck-source.pdf --instruction "Create a crisp 6-slide investor update." --output-format pptx --render-model gemini-3.1-pro-preview --idempotency-key <value>
+python scripts/wait_for_job.py --presentation-id <presentation_id> --download-to ./output.pptx
+```
+
+Staged:
+
+```bash
+python scripts/make_idempotency_key.py --prefix parse
+python scripts/parse_pdf.py --file ./deck-source.pdf --instruction "Create a 6-slide operating review." --render-model gemini-3.1-pro-preview --idempotency-key <value>
+python scripts/wait_for_job.py --presentation-id <presentation_id>
+python scripts/generate_outline.py --presentation-id <presentation_id> --instruction "Emphasize risks, mitigations, and owners."
+python scripts/edit_outline_page.py --presentation-id <presentation_id> --page-number 2 --action modify --instruction "Make this page a sharper executive summary." --idempotency-key <value>
+python scripts/render_slides.py --presentation-id <presentation_id> --render-model gemini-3.1-pro-preview --force
+python scripts/edit_slide_page.py --presentation-id <presentation_id> --page-number 2 --action modify --instruction "Use fewer bullets and a stronger title." --edit-mode layout_only --idempotency-key <value>
+python scripts/export_presentation.py --presentation-id <presentation_id> --output-format pptx --idempotency-key <value>
+python scripts/wait_for_job.py --presentation-id <presentation_id> --download-to ./staged-output.pptx
+```
+
+## Optional MCP pairing
+
+If the host already has a configured `tosea` MCP server, the same workflow can be mirrored through MCP tools. That is optional. The local scripts remain the default execution layer for Claude-style skills.
 
 ## Validate and package
-
-This repo includes a zero-dependency validator and zip packager:
 
 ```bash
 python scripts/validate_skill.py
 python scripts/package_skill.py --version 0.1.0
 ```
-
-## Design goals
-
-- Prefer one-shot generation for speed when the user only wants a finished deck.
-- Prefer staged workflows for iterative work, high-value decks, or when the user asks for edits.
-- Keep cost-sensitive actions explicit.
-- Preserve `presentation_id`, `job`, `filename`, and `download_url` in final summaries.
-- Reuse idempotency keys only for safe retries of the same mutation or create call.
-- Prefer full UUIDv4-style idempotency keys over shortened random fragments.
-- Treat nested export job state as authoritative when `tosea_wait_for_job` returns both top-level presentation status and `data.job`.

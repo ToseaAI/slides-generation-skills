@@ -13,6 +13,25 @@ REQUIRED_FILES = [
     "references/operating-model.md",
     "examples/one-shot-workflow.md",
     "examples/staged-workflow.md",
+    "scripts/_shared.py",
+    "scripts/make_idempotency_key.py",
+    "scripts/health.py",
+    "scripts/get_permissions_summary.py",
+    "scripts/get_quota_status.py",
+    "scripts/check_quota.py",
+    "scripts/pdf_to_presentation.py",
+    "scripts/parse_pdf.py",
+    "scripts/generate_outline.py",
+    "scripts/edit_outline_page.py",
+    "scripts/render_slides.py",
+    "scripts/edit_slide_page.py",
+    "scripts/export_presentation.py",
+    "scripts/wait_for_job.py",
+    "scripts/list_presentations.py",
+    "scripts/get_full_data.py",
+    "scripts/list_exports.py",
+    "scripts/list_export_files.py",
+    "scripts/redownload_export.py",
 ]
 
 
@@ -26,16 +45,20 @@ def main() -> int:
 
     skill_text = (root / "SKILL.md").read_text(encoding="utf-8")
     required_skill_markers = [
-        "tosea_pdf_to_presentation",
-        "tosea_parse_pdf",
-        "tosea_wait_for_job",
+        "python scripts/pdf_to_presentation.py",
+        "python scripts/parse_pdf.py",
+        "python scripts/wait_for_job.py",
+        "python scripts/edit_outline_page.py",
+        "python scripts/edit_slide_page.py",
         "idempotency_key",
         "data.job.status",
         "`401`",
         "`402`",
         "`403`",
         "`404`",
+        "`409`",
         "`429`",
+        "optional MCP",
     ]
     for marker in required_skill_markers:
         if marker not in skill_text:
@@ -43,10 +66,19 @@ def main() -> int:
             return 1
 
     examples = {
-        "examples/one-shot-workflow.md": ["idempotency_key", "job.status"],
-        "examples/staged-workflow.md": ["idempotency_key", "job.status"],
-        "references/mcp-tools.md": ["html_zip", "data.job.status"],
-        "references/operating-model.md": ["idempotency", "data.job"],
+        "examples/one-shot-workflow.md": [
+            "python scripts/pdf_to_presentation.py",
+            "idempotency_key",
+            "data.job.status",
+        ],
+        "examples/staged-workflow.md": [
+            "python scripts/parse_pdf.py",
+            "python scripts/edit_slide_page.py",
+            "idempotency_key",
+            "data.job.status",
+        ],
+        "references/mcp-tools.md": ["pdf_to_presentation.py", "html_zip", "data.job.status"],
+        "references/operating-model.md": ["scripts-first", "idempotency", "optional"],
     }
     for relative, markers in examples.items():
         text = (root / relative).read_text(encoding="utf-8")
@@ -56,8 +88,11 @@ def main() -> int:
                 return 1
 
     metadata = (root / "agents/openai.yaml").read_text(encoding="utf-8")
-    if "required_mcp_servers:" not in metadata or "- tosea" not in metadata:
-        print("agents/openai.yaml must declare the tosea MCP server", file=sys.stderr)
+    if "instructions_file: ../SKILL.md" not in metadata:
+        print("agents/openai.yaml must point at SKILL.md", file=sys.stderr)
+        return 1
+    if "required_mcp_servers:" in metadata:
+        print("agents/openai.yaml must not require MCP for scripts-first mode", file=sys.stderr)
         return 1
 
     print("skill validation ok")

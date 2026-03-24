@@ -1,12 +1,10 @@
 name: tosea-slides
-description: Generate and refine presentations through the ToseaAI MCP server.
+description: Generate and refine presentations through ToseaAI with local scripts and an optional MCP transport.
 version: 0.1.0
 instructions_file: ../SKILL.md
-required_mcp_servers:
-  - tosea
 tags:
   - presentations
   - pdf
   - pptx
-  - mcp
-
+  - scripts
+  - mcp-optional
