@@ -11,7 +11,7 @@ This repository is intentionally separate from both the product backend and the 
 ## What this repo contains
 
 - `SKILL.md`: workflow policy for the agent
-- `scripts/`: thin Python entrypoints that call the public `/api/mcp/v1` HTTP contract
+- `scripts/`: thin Python entrypoints that call the public `/api/mcp/v1` HTTP contract, including the three-step upload flow used by the web app
 - `references/`: compact notes on transport, billing, and endpoint mapping
 - `examples/`: one-shot and staged command examples
 - `agents/openai.yaml`: metadata for OpenAI-compatible skill packaging
@@ -34,6 +34,33 @@ $env:TOSEA_API_KEY="sk_..."
 $env:TOSEA_API_BASE_URL="https://your-tosea-backend.example.com"
 ```
 
+## Windows and OpenClaw path safety
+
+On Windows hosts, especially OpenClaw-style shell execution, raw non-ASCII file paths can be mangled before Python receives them. To avoid that:
+
+- prefer a UTF-8 manifest file via `--manifest`
+- or copy source files to an ASCII-only staging directory such as `C:\tosea-inputs\`
+
+Manifest example:
+
+```json
+{
+  "files": [
+    "C:\\tosea-inputs\\source.pdf",
+    "C:\\tosea-inputs\\source.docx"
+  ]
+}
+```
+
+Reference file: [examples/source-manifest.example.json](examples/source-manifest.example.json)
+
+Then call:
+
+```bash
+python scripts/upload_files.py --manifest ./sources.json
+python scripts/pdf_to_presentation.py --manifest ./sources.json --instruction "Create a crisp 6-slide investor update." --output-format pptx --render-model gemini-3.1-pro-preview --idempotency-key <value>
+```
+
 ## Typical use
 
 Health check:
@@ -47,16 +74,26 @@ python scripts/get_quota_status.py
 One-shot:
 
 ```bash
+python scripts/upload_files.py --file ./deck-source.pdf --file ./deck-source.docx
+# Windows/OpenClaw alternative:
+# python scripts/upload_files.py --manifest ./sources.json
 python scripts/make_idempotency_key.py --prefix one-shot
-python scripts/pdf_to_presentation.py --file ./deck-source.pdf --instruction "Create a crisp 6-slide investor update." --output-format pptx --render-model gemini-3.1-pro-preview --idempotency-key <value>
+python scripts/pdf_to_presentation.py --file ./deck-source.pdf --file ./deck-source.docx --instruction "Create a crisp 6-slide investor update." --output-format pptx --render-model gemini-3.1-pro-preview --idempotency-key <value>
+# Windows/OpenClaw alternative:
+# python scripts/pdf_to_presentation.py --manifest ./sources.json --instruction "Create a crisp 6-slide investor update." --output-format pptx --render-model gemini-3.1-pro-preview --idempotency-key <value>
 python scripts/wait_for_job.py --presentation-id <presentation_id> --download-to ./output.pptx
 ```
 
 Staged:
 
 ```bash
+python scripts/upload_files.py --file ./deck-source.pdf --file ./deck-source.docx
+# Windows/OpenClaw alternative:
+# python scripts/upload_files.py --manifest ./sources.json
 python scripts/make_idempotency_key.py --prefix parse
-python scripts/parse_pdf.py --file ./deck-source.pdf --instruction "Create a 6-slide operating review." --render-model gemini-3.1-pro-preview --idempotency-key <value>
+python scripts/parse_pdf.py --file ./deck-source.pdf --file ./deck-source.docx --instruction "Create a 6-slide operating review." --render-model gemini-3.1-pro-preview --idempotency-key <value>
+# Windows/OpenClaw alternative:
+# python scripts/parse_pdf.py --manifest ./sources.json --instruction "Create a 6-slide operating review." --render-model gemini-3.1-pro-preview --idempotency-key <value>
 python scripts/wait_for_job.py --presentation-id <presentation_id>
 python scripts/generate_outline.py --presentation-id <presentation_id> --instruction "Emphasize risks, mitigations, and owners."
 python scripts/edit_outline_page.py --presentation-id <presentation_id> --page-number 2 --action modify --instruction "Make this page a sharper executive summary." --idempotency-key <value>

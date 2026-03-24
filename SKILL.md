@@ -14,6 +14,7 @@ Run the scripts in `scripts/` directly. Do not assume an MCP server is installed
 - If the base URL already contains `/api`, `/api/v1`, or `/api/mcp/v1`, the scripts normalize it back to the root domain.
 - Run `python scripts/health.py` before expensive work if backend reachability is unknown.
 - Run `python scripts/get_permissions_summary.py` or `python scripts/get_quota_status.py` when the user may be blocked by tier or quota.
+- On Windows/OpenClaw, do not rely on raw non-ASCII file paths in CLI arguments. Prefer `--manifest <utf8-json>` or copy the files to an ASCII-only staging directory such as `C:\tosea-inputs\`.
 
 ## Required mutation discipline
 
@@ -49,26 +50,30 @@ Read `references/mcp-tools.md` only if you need the full script-to-endpoint map.
 ## One-shot workflow
 
 1. Generate a request key with `python scripts/make_idempotency_key.py --prefix oneshot`.
-2. Call `python scripts/pdf_to_presentation.py --file <path> --instruction "<text>" --output-format pptx --idempotency-key <key>`.
-3. Save `presentation_id` from `response.data.presentation_id`.
-4. Poll with `python scripts/wait_for_job.py --presentation-id <id>`.
-5. If the job completes and exposes `download_url`, save it with `--download-to <path>`.
-6. If the user also needs PDF, generate a new key and call `python scripts/export_presentation.py --presentation-id <id> --output-format pdf --idempotency-key <key>`, then poll again.
-7. Optionally inspect exports with `python scripts/list_export_files.py --presentation-id <id>`.
+2. First upload through the product upload system with `python scripts/upload_files.py --file <path> [--file <path>]` if you need explicit upload records or reusable `file_ids`.
+   On Windows/OpenClaw, prefer `python scripts/upload_files.py --manifest ./sources.json`.
+3. Call `python scripts/pdf_to_presentation.py --file <path> [--file <path>] --instruction "<text>" --output-format pptx --idempotency-key <key>`.
+4. Save `presentation_id` from `response.data.presentation_id`.
+5. Poll with `python scripts/wait_for_job.py --presentation-id <id>`.
+6. If the job completes and exposes `download_url`, save it with `--download-to <path>`.
+7. If the user also needs PDF, generate a new key and call `python scripts/export_presentation.py --presentation-id <id> --output-format pdf --idempotency-key <key>`, then poll again.
+8. Optionally inspect exports with `python scripts/list_export_files.py --presentation-id <id>`.
 
 ## Staged workflow
 
 1. Generate a request key with `python scripts/make_idempotency_key.py --prefix parse`.
-2. Call `python scripts/parse_pdf.py --file <path> --instruction "<text>" --idempotency-key <key>`.
-3. Poll with `python scripts/wait_for_job.py --presentation-id <id>`.
-4. Call `python scripts/generate_outline.py --presentation-id <id> --instruction "<text>"`.
-5. Poll again.
-6. For outline revisions, generate a new key and call `python scripts/edit_outline_page.py --presentation-id <id> --page-number <n> --action modify|insert --instruction "<text>" --idempotency-key <key> [--after-slide <n>]`.
-7. Render with `python scripts/render_slides.py --presentation-id <id> [--render-model gemini-3.1-pro-preview] [--image-model <model>] [--force]`.
-8. Poll again.
-9. For slide revisions, generate a new key and call `python scripts/edit_slide_page.py --presentation-id <id> --page-number <n> --action modify|insert --instruction "<text>" --edit-mode outline_layout|layout_only --idempotency-key <key> [--after-slide <n>] [--image-model <model>] [--screenshot-path <path>] [--screenshot-base64 <value>]`.
-10. Export with `python scripts/export_presentation.py --presentation-id <id> --output-format pptx --idempotency-key <key>`, then poll and optionally export PDF the same way.
-11. Use `python scripts/get_full_data.py --presentation-id <id>` whenever you need the current outline, slides, or speaker notes context.
+2. First upload through the product upload system with `python scripts/upload_files.py --file <path> [--file <path>]` if you need explicit upload records or reusable `file_ids`.
+   On Windows/OpenClaw, prefer `python scripts/upload_files.py --manifest ./sources.json`.
+3. Call `python scripts/parse_pdf.py --file <path> [--file <path>] --instruction "<text>" --idempotency-key <key>`.
+4. Poll with `python scripts/wait_for_job.py --presentation-id <id>`.
+5. Call `python scripts/generate_outline.py --presentation-id <id> --instruction "<text>"`.
+6. Poll again.
+7. For outline revisions, generate a new key and call `python scripts/edit_outline_page.py --presentation-id <id> --page-number <n> --action modify|insert --instruction "<text>" --idempotency-key <key> [--after-slide <n>]`.
+8. Render with `python scripts/render_slides.py --presentation-id <id> [--render-model gemini-3.1-pro-preview] [--image-model <model>] [--force]`.
+9. Poll again.
+10. For slide revisions, generate a new key and call `python scripts/edit_slide_page.py --presentation-id <id> --page-number <n> --action modify|insert --instruction "<text>" --edit-mode outline_layout|layout_only --idempotency-key <key> [--after-slide <n>] [--image-model <model>] [--screenshot-path <path>] [--screenshot-base64 <value>]`.
+11. Export with `python scripts/export_presentation.py --presentation-id <id> --output-format pptx --idempotency-key <key>`, then poll and optionally export PDF the same way.
+12. Use `python scripts/get_full_data.py --presentation-id <id>` whenever you need the current outline, slides, or speaker notes context.
 
 ## Script defaults
 
@@ -93,6 +98,23 @@ Read `references/mcp-tools.md` only if you need the full script-to-endpoint map.
 
 If the host already exposes a healthy `tosea` MCP server and the user explicitly wants tool routing instead of local scripts, mirror the same workflow through MCP. Do not make MCP a prerequisite for this skill.
 Treat MCP as an optional MCP transport, not as the default runtime.
+
+## Windows path safety
+
+Preferred manifest shape:
+
+```json
+{
+  "files": [
+    "C:\\tosea-inputs\\source.pdf",
+    "C:\\tosea-inputs\\source.docx"
+  ]
+}
+```
+
+Reference file: `examples/source-manifest.example.json`
+
+If a Windows shell or host mangles a Unicode path before Python receives it, the scripts will fail fast with a local path error and tell the agent to use `--manifest` or an ASCII-only staging path.
 
 ## Final answer expectations
 

@@ -10,6 +10,8 @@ This skill is scripts-first.
 Reliability notes:
 
 - Expensive create, edit, render, and export operations should use explicit `idempotency_key` values.
+- Source files should enter the system through the three-step upload flow so the backend records reusable `file_ids`.
+- On Windows/OpenClaw, prefer `--manifest` or an ASCII-only staging directory for source file paths.
 - Polling is preferred over streaming for skill execution.
 - Preserve `presentation_id` after the first successful create or parse call.
 - For export and one-shot workflows, the authoritative completion signal is nested `data.job.status` when `data.job` exists.

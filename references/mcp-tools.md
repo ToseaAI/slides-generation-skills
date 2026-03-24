@@ -12,8 +12,10 @@ Default execution layer:
 
 Create and mutation scripts:
 
-- `python scripts/pdf_to_presentation.py` -> `POST /api/mcp/v1/pdf-to-presentation`
-- `python scripts/parse_pdf.py` -> `POST /api/mcp/v1/pdf-parse`
+- `python scripts/upload_files.py` -> `POST /api/mcp/v1/files/upload-credentials` + signed URL `PUT` + `POST /api/mcp/v1/files/confirm`
+- `python scripts/list_uploaded_files.py` -> `GET /api/mcp/v1/files`
+- `python scripts/pdf_to_presentation.py` -> `POST /api/mcp/v1/file-ids-to-presentation`
+- `python scripts/parse_pdf.py` -> `POST /api/mcp/v1/file-ids-parse`
 - `python scripts/generate_outline.py` -> `POST /api/mcp/v1/outline-generate`
 - `python scripts/edit_outline_page.py` -> `POST /api/mcp/v1/presentations/{presentation_id}/outlines/{page_number}/ai-edit`
 - `python scripts/render_slides.py` -> `POST /api/mcp/v1/slides-render`
@@ -34,6 +36,8 @@ Recommended defaults:
 
 Notes:
 
+- `upload_files.py` follows the same three-step upload pattern as the web app and returns reusable `file_ids`.
+- `upload_files.py`, `parse_pdf.py`, and `pdf_to_presentation.py` accept `--manifest <utf8-json>` for Windows/OpenClaw-safe path handling.
 - `pdf_to_presentation.py`, `parse_pdf.py`, `edit_outline_page.py`, `edit_slide_page.py`, and `export_presentation.py` should receive explicit `idempotency_key` values.
 - `render_slides.py` is asynchronous but does not currently take `idempotency_key`; use job polling instead of repeated blind retries.
 - `wait_for_job.py` returns the backend jobs payload. When `data.job` exists, use `data.job.status` as the terminal signal.

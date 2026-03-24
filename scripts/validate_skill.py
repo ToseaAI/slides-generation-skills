@@ -13,12 +13,15 @@ REQUIRED_FILES = [
     "references/operating-model.md",
     "examples/one-shot-workflow.md",
     "examples/staged-workflow.md",
+    "examples/source-manifest.example.json",
     "scripts/_shared.py",
     "scripts/make_idempotency_key.py",
     "scripts/health.py",
     "scripts/get_permissions_summary.py",
     "scripts/get_quota_status.py",
     "scripts/check_quota.py",
+    "scripts/upload_files.py",
+    "scripts/list_uploaded_files.py",
     "scripts/pdf_to_presentation.py",
     "scripts/parse_pdf.py",
     "scripts/generate_outline.py",
@@ -47,6 +50,8 @@ def main() -> int:
     required_skill_markers = [
         "python scripts/pdf_to_presentation.py",
         "python scripts/parse_pdf.py",
+        "python scripts/upload_files.py",
+        "--manifest",
         "python scripts/wait_for_job.py",
         "python scripts/edit_outline_page.py",
         "python scripts/edit_slide_page.py",
@@ -68,17 +73,21 @@ def main() -> int:
     examples = {
         "examples/one-shot-workflow.md": [
             "python scripts/pdf_to_presentation.py",
+            "python scripts/upload_files.py",
+            "--manifest",
             "idempotency_key",
             "data.job.status",
         ],
         "examples/staged-workflow.md": [
             "python scripts/parse_pdf.py",
+            "python scripts/upload_files.py",
+            "--manifest",
             "python scripts/edit_slide_page.py",
             "idempotency_key",
             "data.job.status",
         ],
-        "references/mcp-tools.md": ["pdf_to_presentation.py", "html_zip", "data.job.status"],
-        "references/operating-model.md": ["scripts-first", "idempotency", "optional"],
+        "references/mcp-tools.md": ["pdf_to_presentation.py", "upload_files.py", "--manifest", "html_zip", "data.job.status"],
+        "references/operating-model.md": ["scripts-first", "idempotency", "optional", "--manifest"],
     }
     for relative, markers in examples.items():
         text = (root / relative).read_text(encoding="utf-8")

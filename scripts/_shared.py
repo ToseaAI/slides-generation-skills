@@ -79,6 +79,157 @@ def new_idempotency_key(prefix: str | None = None) -> str:
     return f"{normalized}-{uuid.uuid4()}"
 
 
+def _windows_unicode_path_guidance(raw_path: str) -> dict[str, Any]:
+    return {
+        "error": "invalid_windows_path",
+        "raw_path": raw_path,
+        "hint": (
+            "The local path appears to have been mangled before Python received it. "
+            "On Windows/OpenClaw, prefer a UTF-8 manifest file via --manifest or copy "
+            "the source file to an ASCII-only staging path such as C:\\tosea-inputs\\source.pdf."
+        ),
+        "recommended_manifest_shape": {
+            "files": [
+                r"C:\tosea-inputs\source.pdf",
+                r"C:\tosea-inputs\source.docx",
+            ]
+        },
+    }
+
+
+def _raise_local_path_error(raw_path: str, exc: Exception) -> ApiError:
+    winerror = getattr(exc, "winerror", None)
+    if os.name == "nt" and (winerror == 123 or "?" in raw_path or "\ufffd" in raw_path):
+        return ApiError(
+            message="Invalid Windows file path. The shell or host likely mangled a non-ASCII path.",
+            detail=_windows_unicode_path_guidance(raw_path),
+            path="local_file_path",
+        )
+    return ApiError(
+        message=f"Failed to access local file path: {raw_path}",
+        detail={
+            "error": "local_file_access_failed",
+            "raw_path": raw_path,
+            "exception_type": type(exc).__name__,
+            "exception": str(exc),
+        },
+        path="local_file_path",
+    )
+
+
+def coerce_local_file_path(file_path: str | Path) -> Path:
+    raw_path = str(file_path).strip().strip('"')
+    if not raw_path:
+        raise ApiError(
+            message="Empty local file path",
+            detail={"error": "empty_local_file_path"},
+            path="local_file_path",
+        )
+    if os.name == "nt" and ("?" in raw_path or "\ufffd" in raw_path):
+        raise ApiError(
+            message="Invalid Windows file path. The shell or host likely mangled a non-ASCII path.",
+            detail=_windows_unicode_path_guidance(raw_path),
+            path="local_file_path",
+        )
+    try:
+        path = Path(raw_path).expanduser().resolve(strict=False)
+    except OSError as exc:
+        raise _raise_local_path_error(raw_path, exc) from exc
+
+    try:
+        if not path.exists():
+            raise ApiError(
+                message=f"Local file not found: {path}",
+                detail={
+                    "error": "local_file_not_found",
+                    "raw_path": raw_path,
+                    "resolved_path": str(path),
+                },
+                path="local_file_path",
+            )
+    except ApiError:
+        raise
+    except OSError as exc:
+        raise _raise_local_path_error(raw_path, exc) from exc
+
+    if not path.is_file():
+        raise ApiError(
+            message=f"Local path is not a file: {path}",
+            detail={
+                "error": "local_path_not_file",
+                "raw_path": raw_path,
+                "resolved_path": str(path),
+            },
+            path="local_file_path",
+        )
+    return path
+
+
+def load_source_manifest(manifest_path: str | None) -> tuple[list[str], list[str]]:
+    if manifest_path is None:
+        return [], []
+
+    manifest = coerce_local_file_path(manifest_path)
+    try:
+        payload = json.loads(manifest.read_text(encoding="utf-8"))
+    except UnicodeDecodeError as exc:
+        raise ApiError(
+            message="Manifest file must be UTF-8 encoded JSON.",
+            detail={
+                "error": "manifest_not_utf8",
+                "manifest_path": str(manifest),
+            },
+            path="source_manifest",
+        ) from exc
+    except json.JSONDecodeError as exc:
+        raise ApiError(
+            message=f"Manifest file contains invalid JSON: {exc.msg}",
+            detail={
+                "error": "invalid_manifest_json",
+                "manifest_path": str(manifest),
+                "line": exc.lineno,
+                "column": exc.colno,
+            },
+            path="source_manifest",
+        ) from exc
+
+    if isinstance(payload, list):
+        files = payload
+        file_ids: list[str] = []
+    elif isinstance(payload, dict):
+        files = payload.get("files") or payload.get("paths") or []
+        file_ids = payload.get("file_ids") or []
+    else:
+        raise ApiError(
+            message="Manifest JSON must be either a list of file paths or an object with files/file_ids.",
+            detail={
+                "error": "invalid_manifest_shape",
+                "manifest_path": str(manifest),
+            },
+            path="source_manifest",
+        )
+
+    if not isinstance(files, list) or not all(isinstance(item, str) for item in files):
+        raise ApiError(
+            message="Manifest field 'files' must be a list of strings.",
+            detail={
+                "error": "invalid_manifest_files",
+                "manifest_path": str(manifest),
+            },
+            path="source_manifest",
+        )
+    if not isinstance(file_ids, list) or not all(isinstance(item, str) for item in file_ids):
+        raise ApiError(
+            message="Manifest field 'file_ids' must be a list of strings.",
+            detail={
+                "error": "invalid_manifest_file_ids",
+                "manifest_path": str(manifest),
+            },
+            path="source_manifest",
+        )
+    return files, file_ids
+
+
 def parse_json_argument(raw: str | None, *, default: Any = None) -> Any:
     if raw is None:
         return default
@@ -316,6 +467,154 @@ def request_download(url: str, destination: str | Path) -> Path:
     with urlopen(url, timeout=int(os.getenv("TOSEA_API_TIMEOUT_SECONDS", DEFAULT_TIMEOUT_SECONDS))) as response:
         destination_path.write_bytes(response.read())
     return destination_path
+
+
+def guess_mime_type(path: Path) -> str:
+    mime_type = mimetypes.guess_type(path.name)[0]
+    if mime_type:
+        return mime_type
+    return "application/octet-stream"
+
+
+def upload_file_to_signed_url(*, signed_url: str, file_path: Path) -> None:
+    request = Request(
+        signed_url,
+        data=file_path.read_bytes(),
+        headers={
+            "Content-Type": guess_mime_type(file_path),
+            "User-Agent": "tosea-slides-skill/0.1.0",
+        },
+        method="PUT",
+    )
+    try:
+        with urlopen(
+            request,
+            timeout=int(os.getenv("TOSEA_API_TIMEOUT_SECONDS", DEFAULT_TIMEOUT_SECONDS)),
+        ) as response:
+            response.read()
+    except HTTPError as exc:
+        raw_body = exc.read().decode("utf-8", errors="replace")
+        raise ApiError(
+            message=f"Upload failed: HTTP {exc.code}",
+            status_code=exc.code,
+            response_body=raw_body,
+            detail={"error": "upload_failed", "file": str(file_path)},
+            path="signed_url_upload",
+        ) from exc
+    except (URLError, TimeoutError, socket.timeout) as exc:
+        raise ApiError(
+            message=f"Transport error during upload: {exc}",
+            detail={"error": "transport_error", "retryable": True},
+            path="signed_url_upload",
+        ) from exc
+
+
+def request_upload_credentials(
+    *,
+    api_key: str,
+    file_path: Path,
+    base_url: str | None = None,
+    metadata: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    return request_json(
+        "POST",
+        "/files/upload-credentials",
+        api_key=api_key,
+        base_url=base_url,
+        json_body={
+            "filename": file_path.name,
+            "file_type": file_path.suffix.lstrip(".").lower(),
+            "file_size": file_path.stat().st_size,
+            "metadata": metadata,
+        },
+    )
+
+
+def confirm_uploaded_file(
+    *,
+    api_key: str,
+    file_id: str,
+    base_url: str | None = None,
+) -> dict[str, Any]:
+    return request_json(
+        "POST",
+        "/files/confirm",
+        api_key=api_key,
+        base_url=base_url,
+        json_body={"file_id": file_id},
+    )
+
+
+def upload_path_and_get_file_id(
+    *,
+    api_key: str,
+    file_path: str | Path,
+    base_url: str | None = None,
+    metadata: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    path = coerce_local_file_path(file_path)
+    credentials_response = request_upload_credentials(
+        api_key=api_key,
+        file_path=path,
+        base_url=base_url,
+        metadata=metadata,
+    )
+    credentials = credentials_response.get("data") or {}
+    file_id = credentials.get("file_id")
+    if not file_id:
+        raise ApiError(
+            message="Upload credentials response missing file_id",
+            detail=credentials_response,
+            path="/files/upload-credentials",
+        )
+    if not credentials.get("duplicate"):
+        signed_url = credentials.get("signed_url")
+        if not signed_url:
+            raise ApiError(
+                message="Upload credentials response missing signed_url",
+                detail=credentials_response,
+                path="/files/upload-credentials",
+            )
+        upload_file_to_signed_url(signed_url=signed_url, file_path=path)
+    confirm_response = confirm_uploaded_file(
+        api_key=api_key,
+        file_id=file_id,
+        base_url=base_url,
+    )
+    return {
+        "path": str(path),
+        "file_id": file_id,
+        "duplicate": bool(credentials.get("duplicate")),
+        "credentials": credentials_response,
+        "confirm": confirm_response,
+    }
+
+
+def resolve_source_file_ids(
+    *,
+    api_key: str,
+    base_url: str | None = None,
+    local_files: list[str] | None = None,
+    existing_file_ids: list[str] | None = None,
+    manifest_path: str | None = None,
+) -> tuple[list[str], list[dict[str, Any]]]:
+    manifest_files, manifest_file_ids = load_source_manifest(manifest_path)
+    resolved_ids = list(existing_file_ids or []) + list(manifest_file_ids or [])
+    upload_results: list[dict[str, Any]] = []
+    for value in [*(local_files or []), *manifest_files]:
+        result = upload_path_and_get_file_id(
+            api_key=api_key,
+            file_path=value,
+            base_url=base_url,
+        )
+        resolved_ids.append(result["file_id"])
+        upload_results.append(result)
+    if not resolved_ids:
+        raise ApiError(
+            message="At least one --file or --file-id is required",
+            detail={"error": "missing_source_files"},
+        )
+    return resolved_ids, upload_results
 
 
 def extract_terminal_status(payload: dict[str, Any]) -> str:

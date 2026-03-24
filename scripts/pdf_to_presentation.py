@@ -2,7 +2,6 @@
 from __future__ import annotations
 
 import argparse
-from pathlib import Path
 
 from _shared import (
     add_common_auth_args,
@@ -10,6 +9,7 @@ from _shared import (
     mutation_envelope,
     new_idempotency_key,
     request_json,
+    resolve_source_file_ids,
     resolve_api_key,
 )
 
@@ -17,7 +17,9 @@ from _shared import (
 def main() -> int:
     parser = argparse.ArgumentParser(description="Create a presentation and queue one-shot generation.")
     add_common_auth_args(parser)
-    parser.add_argument("--file", dest="files", action="append", required=True, help="Local source file path. Repeat for multiple files.")
+    parser.add_argument("--file", dest="files", action="append", default=[], help="Local source file path. Repeat for multiple files.")
+    parser.add_argument("--file-id", dest="file_ids", action="append", default=[], help="Confirmed uploaded file_id. Repeat for multiple files.")
+    parser.add_argument("--manifest", default=None, help="UTF-8 JSON manifest containing files and optional file_ids.")
     parser.add_argument("--instruction", default="", help="User instruction for the deck.")
     parser.add_argument("--output-format", default="pptx", help="pptx, pptx_image, pdf, or html_zip.")
     parser.add_argument("--render-provider", default="default")
@@ -30,10 +32,20 @@ def main() -> int:
     parser.add_argument("--idempotency-key", default=None)
     args = parser.parse_args()
 
-    api_key = resolve_api_key(args.api_key)
     idempotency_key = args.idempotency_key or new_idempotency_key("one-shot")
-    files = [("files", Path(value).resolve()) for value in args.files]
+    try:
+        api_key = resolve_api_key(args.api_key)
+        file_ids, upload_results = resolve_source_file_ids(
+            api_key=api_key,
+            base_url=args.base_url,
+            local_files=args.files,
+            existing_file_ids=args.file_ids,
+            manifest_path=args.manifest,
+        )
+    except Exception as exc:
+        return emit_error(exc, idempotency_key=idempotency_key)
     request_payload = {
+        "file_ids": file_ids,
         "instruction": args.instruction,
         "output_format": args.output_format,
         "render_provider": args.render_provider,
@@ -47,22 +59,23 @@ def main() -> int:
     try:
         response = request_json(
             "POST",
-            "/pdf-to-presentation",
+            "/file-ids-to-presentation",
             api_key=api_key,
             base_url=args.base_url,
             idempotency_key=idempotency_key,
-            form_fields={k: str(v) for k, v in request_payload.items() if v not in (None, "")},
-            file_fields=files,
+            json_body={k: v for k, v in request_payload.items() if v not in (None, "", [])},
         )
     except Exception as exc:
         return emit_error(exc, idempotency_key=idempotency_key)
 
     payload = mutation_envelope(
-        path="/pdf-to-presentation",
+        path="/file-ids-to-presentation",
         idempotency_key=idempotency_key,
         response=response,
         request_payload=request_payload,
     )
+    if upload_results:
+        payload["uploads"] = upload_results
     from _shared import emit_json
 
     emit_json(payload)

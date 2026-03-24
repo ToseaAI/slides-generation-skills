@@ -1,10 +1,13 @@
 # Example: Staged Workflow
 
-1. Parse with a fresh request key:
+1. Upload and parse with a fresh request key:
 
 ```bash
+python scripts/upload_files.py --file ./source.pdf --file ./source.docx
+python scripts/upload_files.py --manifest ./sources.json  # Windows/OpenClaw alternative
 python scripts/make_idempotency_key.py --prefix parse
-python scripts/parse_pdf.py --file ./source.pdf --instruction "Create a 6-slide operating review." --render-model gemini-3.1-pro-preview --idempotency-key <idempotency_key>
+python scripts/parse_pdf.py --file ./source.pdf --file ./source.docx --instruction "Create a 6-slide operating review." --render-model gemini-3.1-pro-preview --idempotency-key <idempotency_key>
+python scripts/parse_pdf.py --manifest ./sources.json --instruction "Create a 6-slide operating review." --render-model gemini-3.1-pro-preview --idempotency-key <idempotency_key>  # Windows/OpenClaw alternative
 python scripts/wait_for_job.py --presentation-id <presentation_id>
 ```
 

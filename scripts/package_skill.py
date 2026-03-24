@@ -21,6 +21,8 @@ INCLUDE_SCRIPT_PATHS = [
     "scripts/get_permissions_summary.py",
     "scripts/get_quota_status.py",
     "scripts/check_quota.py",
+    "scripts/upload_files.py",
+    "scripts/list_uploaded_files.py",
     "scripts/pdf_to_presentation.py",
     "scripts/parse_pdf.py",
     "scripts/generate_outline.py",

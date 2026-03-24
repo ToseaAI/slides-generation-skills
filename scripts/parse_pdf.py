@@ -2,7 +2,6 @@
 from __future__ import annotations
 
 import argparse
-from pathlib import Path
 
 from _shared import (
     add_common_auth_args,
@@ -10,6 +9,7 @@ from _shared import (
     mutation_envelope,
     new_idempotency_key,
     request_json,
+    resolve_source_file_ids,
     resolve_api_key,
 )
 
@@ -17,7 +17,9 @@ from _shared import (
 def main() -> int:
     parser = argparse.ArgumentParser(description="Upload source files and queue parse-only processing.")
     add_common_auth_args(parser)
-    parser.add_argument("--file", dest="files", action="append", required=True, help="Local source file path. Repeat for multiple files.")
+    parser.add_argument("--file", dest="files", action="append", default=[], help="Local source file path. Repeat for multiple files.")
+    parser.add_argument("--file-id", dest="file_ids", action="append", default=[], help="Confirmed uploaded file_id. Repeat for multiple files.")
+    parser.add_argument("--manifest", default=None, help="UTF-8 JSON manifest containing files and optional file_ids.")
     parser.add_argument("--instruction", default="", help="User instruction for parse and outline scope.")
     parser.add_argument("--render-provider", default="default")
     parser.add_argument("--render-model", default="gemini-3.1-pro-preview")
@@ -29,10 +31,20 @@ def main() -> int:
     parser.add_argument("--idempotency-key", default=None)
     args = parser.parse_args()
 
-    api_key = resolve_api_key(args.api_key)
     idempotency_key = args.idempotency_key or new_idempotency_key("parse")
-    files = [("files", Path(value).resolve()) for value in args.files]
+    try:
+        api_key = resolve_api_key(args.api_key)
+        file_ids, upload_results = resolve_source_file_ids(
+            api_key=api_key,
+            base_url=args.base_url,
+            local_files=args.files,
+            existing_file_ids=args.file_ids,
+            manifest_path=args.manifest,
+        )
+    except Exception as exc:
+        return emit_error(exc, idempotency_key=idempotency_key)
     request_payload = {
+        "file_ids": file_ids,
         "instruction": args.instruction,
         "render_provider": args.render_provider,
         "render_model": args.render_model,
@@ -45,26 +57,25 @@ def main() -> int:
     try:
         response = request_json(
             "POST",
-            "/pdf-parse",
+            "/file-ids-parse",
             api_key=api_key,
             base_url=args.base_url,
             idempotency_key=idempotency_key,
-            form_fields={k: str(v) for k, v in request_payload.items() if v not in (None, "")},
-            file_fields=files,
+            json_body={k: v for k, v in request_payload.items() if v not in (None, "", [])},
         )
     except Exception as exc:
         return emit_error(exc, idempotency_key=idempotency_key)
 
     from _shared import emit_json
-
-    emit_json(
-        mutation_envelope(
-            path="/pdf-parse",
-            idempotency_key=idempotency_key,
-            response=response,
-            request_payload=request_payload,
-        )
+    payload = mutation_envelope(
+        path="/file-ids-parse",
+        idempotency_key=idempotency_key,
+        response=response,
+        request_payload=request_payload,
     )
+    if upload_results:
+        payload["uploads"] = upload_results
+    emit_json(payload)
     return 0
 
 
