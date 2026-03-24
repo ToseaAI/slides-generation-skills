@@ -28,3 +28,8 @@ Recommended defaults:
 - `slide_mode`: `html` unless the user explicitly wants image mode
 - `output_format`: `pptx` for editable decks, `pdf` for review handoff
 
+Notes:
+
+- `tosea_wait_for_job` returns the backend jobs payload. When `data.job` exists, use `data.job.status` as the terminal signal for export and one-shot flows.
+- `tosea_parse_pdf` and `tosea_pdf_to_presentation` support `idempotency_key` for same-request retries.
+- `tosea_export_presentation` and `tosea_redownload_export` support `html_zip` for HTML-mode decks.

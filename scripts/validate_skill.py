@@ -25,12 +25,35 @@ def main() -> int:
         return 1
 
     skill_text = (root / "SKILL.md").read_text(encoding="utf-8")
-    if "tosea_pdf_to_presentation" not in skill_text:
-        print("SKILL.md must mention tosea_pdf_to_presentation", file=sys.stderr)
-        return 1
-    if "tosea_wait_for_job" not in skill_text:
-        print("SKILL.md must mention tosea_wait_for_job", file=sys.stderr)
-        return 1
+    required_skill_markers = [
+        "tosea_pdf_to_presentation",
+        "tosea_parse_pdf",
+        "tosea_wait_for_job",
+        "idempotency_key",
+        "data.job.status",
+        "`401`",
+        "`402`",
+        "`403`",
+        "`404`",
+        "`429`",
+    ]
+    for marker in required_skill_markers:
+        if marker not in skill_text:
+            print(f"SKILL.md must mention {marker}", file=sys.stderr)
+            return 1
+
+    examples = {
+        "examples/one-shot-workflow.md": ["idempotency_key", "job.status"],
+        "examples/staged-workflow.md": ["idempotency_key", "job.status"],
+        "references/mcp-tools.md": ["html_zip", "data.job.status"],
+        "references/operating-model.md": ["idempotency", "data.job"],
+    }
+    for relative, markers in examples.items():
+        text = (root / relative).read_text(encoding="utf-8")
+        for marker in markers:
+            if marker not in text:
+                print(f"{relative} must mention {marker}", file=sys.stderr)
+                return 1
 
     metadata = (root / "agents/openai.yaml").read_text(encoding="utf-8")
     if "required_mcp_servers:" not in metadata or "- tosea" not in metadata:
@@ -43,4 +66,3 @@ def main() -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
-

@@ -1,3 +1,6 @@
 .DS_Store
 Thumbs.db
 dist/
+artifacts/
+scripts/__pycache__/
+*.pyc

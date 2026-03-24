@@ -1,6 +1,6 @@
 # Example: Staged Workflow
 
-1. `tosea_parse_pdf`
+1. `tosea_parse_pdf` with a fresh `idempotency_key`
 2. `tosea_wait_for_job`
 3. `tosea_generate_outline`
 4. `tosea_wait_for_job`
@@ -14,3 +14,4 @@
 
 Use this path when the user asks for outline changes, inserted slides, or iteration after review.
 
+For the export step, use nested `job.status` from the jobs payload when present.

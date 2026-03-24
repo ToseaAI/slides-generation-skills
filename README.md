@@ -51,4 +51,6 @@ python scripts/package_skill.py --version 0.1.0
 - Prefer staged workflows for iterative work, high-value decks, or when the user asks for edits.
 - Keep cost-sensitive actions explicit.
 - Preserve `presentation_id`, `job`, `filename`, and `download_url` in final summaries.
-- Reuse idempotency keys only for safe retries of the same mutation.
+- Reuse idempotency keys only for safe retries of the same mutation or create call.
+- Prefer full UUIDv4-style idempotency keys over shortened random fragments.
+- Treat nested export job state as authoritative when `tosea_wait_for_job` returns both top-level presentation status and `data.job`.
