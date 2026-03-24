@@ -38,8 +38,10 @@ Notes:
 
 - `upload_files.py` follows the same three-step upload pattern as the web app and returns reusable `file_ids`.
 - `upload_files.py`, `parse_pdf.py`, and `pdf_to_presentation.py` accept `--manifest <utf8-json>` for Windows/OpenClaw-safe path handling.
+- `pdf_to_presentation.py` and `export_presentation.py` accept `--export-filename` when the user cares about the visible exported attachment name.
 - `pdf_to_presentation.py`, `parse_pdf.py`, `edit_outline_page.py`, `edit_slide_page.py`, and `export_presentation.py` should receive explicit `idempotency_key` values.
 - `render_slides.py` is asynchronous but does not currently take `idempotency_key`; use job polling instead of repeated blind retries.
 - `wait_for_job.py` returns the backend jobs payload. When `data.job` exists, use `data.job.status` as the terminal signal.
+- When `wait_for_job.py --download-to <directory>` is used, it prefers the backend job filename or the signed URL download hint before falling back to the URL path.
 - `html_zip` is a valid export format only for HTML-mode decks.
 - If the host already has a healthy `tosea` MCP server, the same operations can be mirrored through MCP, but that mode is optional.

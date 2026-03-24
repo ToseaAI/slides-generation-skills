@@ -18,6 +18,11 @@ def main() -> int:
     add_common_auth_args(parser)
     parser.add_argument("--presentation-id", required=True, help="Presentation UUID.")
     parser.add_argument("--output-format", required=True, help="pptx, pptx_image, pdf, or html_zip.")
+    parser.add_argument(
+        "--export-filename",
+        default=None,
+        help="Preferred exported filename shown to downstream clients.",
+    )
     parser.add_argument("--idempotency-key", default=None)
     args = parser.parse_args()
 
@@ -26,6 +31,7 @@ def main() -> int:
     request_payload = {
         "presentation_id": args.presentation_id,
         "output_format": args.output_format,
+        "export_filename": args.export_filename,
     }
     try:
         response = request_json(
@@ -34,7 +40,7 @@ def main() -> int:
             api_key=api_key,
             base_url=args.base_url,
             idempotency_key=idempotency_key,
-            json_body=request_payload,
+            json_body={k: v for k, v in request_payload.items() if v not in (None, "", [])},
         )
     except Exception as exc:
         return emit_error(exc, idempotency_key=idempotency_key)

@@ -54,6 +54,14 @@ Manifest example:
 
 Reference file: [examples/source-manifest.example.json](examples/source-manifest.example.json)
 
+## Attachment delivery safety
+
+If the generated deck will be re-uploaded through OpenClaw, WeChat, email, or another relay layer:
+
+- pass `--export-filename` when the user cares about the final visible attachment name
+- preserve filename, extension, and `Content-Type` when relaying the downloaded file
+- do not repackage the file as an anonymous binary attachment, or downstream clients may show only a generic attachment label
+
 Then call:
 
 ```bash
@@ -78,10 +86,10 @@ python scripts/upload_files.py --file ./deck-source.pdf --file ./deck-source.doc
 # Windows/OpenClaw alternative:
 # python scripts/upload_files.py --manifest ./sources.json
 python scripts/make_idempotency_key.py --prefix one-shot
-python scripts/pdf_to_presentation.py --file ./deck-source.pdf --file ./deck-source.docx --instruction "Create a crisp 6-slide investor update." --output-format pptx --render-model gemini-3.1-pro-preview --idempotency-key <value>
+python scripts/pdf_to_presentation.py --file ./deck-source.pdf --file ./deck-source.docx --instruction "Create a crisp 6-slide investor update." --output-format pptx --export-filename investor_update_final.pptx --render-model gemini-3.1-pro-preview --idempotency-key <value>
 # Windows/OpenClaw alternative:
-# python scripts/pdf_to_presentation.py --manifest ./sources.json --instruction "Create a crisp 6-slide investor update." --output-format pptx --render-model gemini-3.1-pro-preview --idempotency-key <value>
-python scripts/wait_for_job.py --presentation-id <presentation_id> --download-to ./output.pptx
+# python scripts/pdf_to_presentation.py --manifest ./sources.json --instruction "Create a crisp 6-slide investor update." --output-format pptx --export-filename investor_update_final.pptx --render-model gemini-3.1-pro-preview --idempotency-key <value>
+python scripts/wait_for_job.py --presentation-id <presentation_id> --download-to ./investor_update_final.pptx
 ```
 
 Staged:
@@ -99,8 +107,8 @@ python scripts/generate_outline.py --presentation-id <presentation_id> --instruc
 python scripts/edit_outline_page.py --presentation-id <presentation_id> --page-number 2 --action modify --instruction "Make this page a sharper executive summary." --idempotency-key <value>
 python scripts/render_slides.py --presentation-id <presentation_id> --render-model gemini-3.1-pro-preview --force
 python scripts/edit_slide_page.py --presentation-id <presentation_id> --page-number 2 --action modify --instruction "Use fewer bullets and a stronger title." --edit-mode layout_only --idempotency-key <value>
-python scripts/export_presentation.py --presentation-id <presentation_id> --output-format pptx --idempotency-key <value>
-python scripts/wait_for_job.py --presentation-id <presentation_id> --download-to ./staged-output.pptx
+python scripts/export_presentation.py --presentation-id <presentation_id> --output-format pptx --export-filename staged_review_final.pptx --idempotency-key <value>
+python scripts/wait_for_job.py --presentation-id <presentation_id> --download-to ./staged_review_final.pptx
 ```
 
 ## Optional MCP pairing

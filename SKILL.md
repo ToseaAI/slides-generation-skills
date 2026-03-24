@@ -15,6 +15,8 @@ Run the scripts in `scripts/` directly. Do not assume an MCP server is installed
 - Run `python scripts/health.py` before expensive work if backend reachability is unknown.
 - Run `python scripts/get_permissions_summary.py` or `python scripts/get_quota_status.py` when the user may be blocked by tier or quota.
 - On Windows/OpenClaw, do not rely on raw non-ASCII file paths in CLI arguments. Prefer `--manifest <utf8-json>` or copy the files to an ASCII-only staging directory such as `C:\tosea-inputs\`.
+- When the user cares about the final attachment name, pass `--export-filename "<name>.pptx|pdf|zip"` on one-shot or export commands.
+- If an exported file will be relayed through OpenClaw, WeChat, email, or another chat surface, preserve filename, extension, and `Content-Type`. Do not repack it as an anonymous binary attachment.
 
 ## Required mutation discipline
 
@@ -53,10 +55,11 @@ Read `references/mcp-tools.md` only if you need the full script-to-endpoint map.
 2. First upload through the product upload system with `python scripts/upload_files.py --file <path> [--file <path>]` if you need explicit upload records or reusable `file_ids`.
    On Windows/OpenClaw, prefer `python scripts/upload_files.py --manifest ./sources.json`.
 3. Call `python scripts/pdf_to_presentation.py --file <path> [--file <path>] --instruction "<text>" --output-format pptx --idempotency-key <key>`.
+   Add `--export-filename "<name>.pptx"` when the user cares about the final attachment name.
 4. Save `presentation_id` from `response.data.presentation_id`.
 5. Poll with `python scripts/wait_for_job.py --presentation-id <id>`.
-6. If the job completes and exposes `download_url`, save it with `--download-to <path>`.
-7. If the user also needs PDF, generate a new key and call `python scripts/export_presentation.py --presentation-id <id> --output-format pdf --idempotency-key <key>`, then poll again.
+6. If the job completes and exposes `download_url`, save it with an explicit file path when the final filename matters, for example `--download-to ./board_update_final.pptx`.
+7. If the user also needs PDF, generate a new key and call `python scripts/export_presentation.py --presentation-id <id> --output-format pdf --idempotency-key <key> [--export-filename "<name>.pdf"]`, then poll again.
 8. Optionally inspect exports with `python scripts/list_export_files.py --presentation-id <id>`.
 
 ## Staged workflow
@@ -72,7 +75,7 @@ Read `references/mcp-tools.md` only if you need the full script-to-endpoint map.
 8. Render with `python scripts/render_slides.py --presentation-id <id> [--render-model gemini-3.1-pro-preview] [--image-model <model>] [--force]`.
 9. Poll again.
 10. For slide revisions, generate a new key and call `python scripts/edit_slide_page.py --presentation-id <id> --page-number <n> --action modify|insert --instruction "<text>" --edit-mode outline_layout|layout_only --idempotency-key <key> [--after-slide <n>] [--image-model <model>] [--screenshot-path <path>] [--screenshot-base64 <value>]`.
-11. Export with `python scripts/export_presentation.py --presentation-id <id> --output-format pptx --idempotency-key <key>`, then poll and optionally export PDF the same way.
+11. Export with `python scripts/export_presentation.py --presentation-id <id> --output-format pptx --idempotency-key <key> [--export-filename "<name>.pptx"]`, then poll and optionally export PDF the same way.
 12. Use `python scripts/get_full_data.py --presentation-id <id>` whenever you need the current outline, slides, or speaker notes context.
 
 ## Script defaults
@@ -82,6 +85,7 @@ Read `references/mcp-tools.md` only if you need the full script-to-endpoint map.
 - Use `--output-format pptx` for editable decks and `--output-format pdf` for review handoff.
 - Use `--output-format html_zip` only for HTML-mode decks.
 - Pass `--image-model` only when the user explicitly asks for image quality or image-mode consistency.
+- When a downstream chat client or relay layer cares about the visible attachment name, pass `--export-filename` and save with an explicit `--download-to` filename.
 
 ## Error handling
 
@@ -124,4 +128,5 @@ Always include:
 - the `presentation_id`
 - the terminal job outcome, using nested `data.job.status` when present
 - export filenames and download URLs when available
+- when relaying to OpenClaw, WeChat, email, or another chat surface, a reminder to preserve filename, extension, and MIME metadata
 - any quota, billing, or retry blockers

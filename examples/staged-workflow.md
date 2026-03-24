@@ -33,10 +33,10 @@ python scripts/edit_slide_page.py --presentation-id <presentation_id> --page-num
 
 ```bash
 python scripts/make_idempotency_key.py --prefix xp
-python scripts/export_presentation.py --presentation-id <presentation_id> --output-format pptx --idempotency-key <idempotency_key>
-python scripts/wait_for_job.py --presentation-id <presentation_id> --download-to ./staged-output.pptx
+python scripts/export_presentation.py --presentation-id <presentation_id> --output-format pptx --export-filename staged_review_final.pptx --idempotency-key <idempotency_key>
+python scripts/wait_for_job.py --presentation-id <presentation_id> --download-to ./staged_review_final.pptx
 ```
 
 Use this path when the user asks for outline changes, inserted slides, or iteration after review.
 
-For the export step, use nested `data.job.status` from the jobs payload when present.
+For the export step, use nested `data.job.status` from the jobs payload when present. If the file will be relayed through OpenClaw, WeChat, email, or another chat surface, preserve filename, extension, and MIME metadata.

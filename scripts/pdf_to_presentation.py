@@ -29,6 +29,11 @@ def main() -> int:
     parser.add_argument("--template-name", default="beamer_classic")
     parser.add_argument("--slide-mode", default="html", help="html or image.")
     parser.add_argument("--image-model", default=None)
+    parser.add_argument(
+        "--export-filename",
+        default=None,
+        help="Preferred exported filename shown to downstream clients.",
+    )
     parser.add_argument("--idempotency-key", default=None)
     args = parser.parse_args()
 
@@ -55,6 +60,7 @@ def main() -> int:
         "template_name": args.template_name,
         "slide_mode": args.slide_mode,
         "image_model": args.image_model,
+        "export_filename": args.export_filename,
     }
     try:
         response = request_json(

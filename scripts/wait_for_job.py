@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import argparse
 from pathlib import Path
-from urllib.parse import urlparse
+from urllib.parse import parse_qs, urlparse
 
 from _shared import (
     add_common_auth_args,
@@ -15,10 +15,19 @@ from _shared import (
 )
 
 
-def _resolve_download_target(download_to: str, download_url: str) -> Path:
+def _resolve_download_target(
+    download_to: str, download_url: str, job_filename: str | None = None
+) -> Path:
     target = Path(download_to)
     if download_to.endswith(("\\", "/")) or target.is_dir():
-        filename = Path(urlparse(download_url).path).name or "download.bin"
+        parsed_url = urlparse(download_url)
+        query = parse_qs(parsed_url.query)
+        filename = (
+            job_filename
+            or (query.get("download") or [None])[0]
+            or Path(parsed_url.path).name
+            or "download.bin"
+        )
         return target / filename
     return target
 
@@ -51,8 +60,9 @@ def main():
     data = response.get("data") or {}
     job = data.get("job") or {}
     download_url = job.get("download_url") if isinstance(job, dict) else None
+    job_filename = job.get("filename") if isinstance(job, dict) else None
     if args.download_to and download_url:
-        target = _resolve_download_target(args.download_to, download_url)
+        target = _resolve_download_target(args.download_to, download_url, job_filename)
         saved_path = request_download(download_url, target)
         payload["saved_to"] = str(saved_path.resolve())
     return payload

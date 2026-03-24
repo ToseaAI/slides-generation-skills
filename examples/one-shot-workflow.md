@@ -28,6 +28,7 @@ python scripts/pdf_to_presentation.py \
   --file ./source.docx \
   --instruction "Create a crisp 6-slide executive deck." \
   --output-format pptx \
+  --export-filename executive_deck_final.pptx \
   --render-model gemini-3.1-pro-preview \
   --idempotency-key <idempotency_key>
 ```
@@ -39,6 +40,7 @@ python scripts/pdf_to_presentation.py \
   --manifest ./sources.json \
   --instruction "Create a crisp 6-slide executive deck." \
   --output-format pptx \
+  --export-filename executive_deck_final.pptx \
   --render-model gemini-3.1-pro-preview \
   --idempotency-key <idempotency_key>
 ```
@@ -46,15 +48,15 @@ python scripts/pdf_to_presentation.py \
 4. Poll completion:
 
 ```bash
-python scripts/wait_for_job.py --presentation-id <presentation_id> --download-to ./output.pptx
+python scripts/wait_for_job.py --presentation-id <presentation_id> --download-to ./executive_deck_final.pptx
 ```
 
 5. Optional PDF export:
 
 ```bash
 python scripts/make_idempotency_key.py --prefix pdf
-python scripts/export_presentation.py --presentation-id <presentation_id> --output-format pdf --idempotency-key <idempotency_key>
-python scripts/wait_for_job.py --presentation-id <presentation_id> --download-to ./output.pdf
+python scripts/export_presentation.py --presentation-id <presentation_id> --output-format pdf --export-filename executive_deck_final.pdf --idempotency-key <idempotency_key>
+python scripts/wait_for_job.py --presentation-id <presentation_id> --download-to ./executive_deck_final.pdf
 ```
 
 Report back:
@@ -63,3 +65,4 @@ Report back:
 - final status, using nested `data.job.status` when present
 - produced filename
 - download URL
+- relay warning if OpenClaw, WeChat, email, or another downstream client must preserve filename, extension, and MIME
