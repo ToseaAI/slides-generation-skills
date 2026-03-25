@@ -132,10 +132,11 @@ A logo can be added to any presentation in any mode (HTML or image). Upload the 
 
 ```bash
 python scripts/upload_files.py --file ./company-logo.png
-# Use the returned file_id:
+# The JSON output contains "file_id" — extract and save it
+
 python scripts/pdf_to_presentation.py \
   --file ./source.pdf \
-  --logo-file-id <logo-file-id> \
+  --logo-file-id <file-id-from-upload> \
   --instruction "..." \
   --output-format pptx \
   --idempotency-key <key>
@@ -265,16 +266,17 @@ python scripts/upload_files.py --file ./quarterly-report.pdf
 
 # 2. Upload the TEMPLATE file separately — this is the design, not source content
 python scripts/upload_files.py --file ./brand-template.pptx
-# Save the returned file_id from this upload (e.g. "abc-123-def")
+# The JSON output contains "file_id" — extract and save it for step 3
 
 # 3. Generate the presentation in image mode with the custom template
+#    Replace <template-file-id> with the file_id from step 2
 python scripts/make_idempotency_key.py --prefix oneshot
 python scripts/pdf_to_presentation.py \
   --file ./quarterly-report.pdf \
   --instruction "Create a 10-slide board update matching our brand style." \
   --slide-mode image \
   --image-model nano-banana-2 \
-  --template-file-id abc-123-def \
+  --template-file-id <template-file-id> \
   --output-format pptx_image \
   --idempotency-key <key>
 
