@@ -54,8 +54,11 @@ Read `references/mcp-tools.md` only if you need the full script-to-endpoint map.
 - Keep `--slide-mode html` unless the user explicitly asks for image-mode rendering, image-first composition, template-driven image generation, or image-only visual consistency.
 - If you use `--slide-mode image`, pass `--image-model` when the user cares about image quality or consistent image regeneration.
 - `--slide-mode image` does not automatically imply `--output-format pptx_image`.
-- Use `--output-format pptx_image` when the user specifically wants a pure image-based PPTX export.
-- Use `--output-format pdf` when the user wants a review artifact from an image-mode deck.
+- In image mode, choose export format by delivery expectation:
+  - use `--output-format pdf` for review, approval, or read-only handoff
+  - use `--output-format pptx_image` when the user wants a PPTX deliverable that should preserve the generated visuals as-is
+  - use `--output-format pptx` only when the user explicitly wants an editable PPTX or plans to keep editing in PowerPoint/Keynote
+- If the user asks for a "PPTX" in image mode but does not say it must remain editable, prefer `--output-format pptx_image`.
 - Do not use `--output-format html_zip` for image-mode decks.
 
 ## Asset file_id rule
@@ -80,7 +83,8 @@ Read `references/mcp-tools.md` only if you need the full script-to-endpoint map.
 3. Upload logo or template assets separately when needed, then keep their returned `file_id` values for `--logo-file-id` or `--template-file-id`.
 4. Call `python scripts/pdf_to_presentation.py --file <path> [--file <path>] --instruction "<text>" --output-format pptx --idempotency-key <key>`.
    Add `--export-filename "<name>.pptx"` when the user cares about the final attachment name.
-   Only add `--slide-mode image [--image-model <model>]` when the user explicitly wants image mode. If the user wants an image-based PPTX deliverable, use `--output-format pptx_image`.
+   Only add `--slide-mode image [--image-model <model>]` when the user explicitly wants image mode.
+   In image mode, use `--output-format pptx_image` unless the user clearly asks for an editable PPTX; use `--output-format pdf` for review handoff.
    Add `--logo-file-id <id>` when a confirmed uploaded logo asset should be applied.
    Add `--template-file-id <id>` only for image-mode custom-template runs.
 5. Save `presentation_id` from `response.data.presentation_id`.
@@ -113,7 +117,7 @@ Read `references/mcp-tools.md` only if you need the full script-to-endpoint map.
 - Prefer `--render-model gemini-3.1-pro-preview` for quality-sensitive decks.
 - Prefer `--slide-mode html` unless the user explicitly wants image mode.
 - Use `--output-format pptx` for editable decks and `--output-format pdf` for review handoff.
-- Use `--output-format pptx_image` when an image-mode deck must be delivered as a pure image-based PPTX.
+- In image mode, prefer `--output-format pptx_image` for PPTX delivery unless the user explicitly asks for editability.
 - Use `--output-format html_zip` only for HTML-mode decks.
 - Pass `--image-model` only when the user explicitly asks for image quality or image-mode consistency.
 - When a downstream chat client or relay layer cares about the visible attachment name, pass `--export-filename` and save with an explicit `--download-to` filename.

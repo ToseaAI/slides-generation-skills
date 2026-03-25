@@ -33,7 +33,7 @@ Recommended defaults:
 - `render_model`: `gemini-3.1-pro-preview` for quality-sensitive work
 - `slide_mode`: `html` unless the user explicitly wants image mode
 - `output_format`: `pptx` for editable decks, `pdf` for review handoff
-- `output_format`: `pptx_image` when an image-mode deck must be delivered as a pure image-based PPTX
+- `output_format`: `pptx_image` when an image-mode deck must be delivered as a PPTX while preserving the generated visuals as-is
 - `logo_file_id`: confirmed uploaded logo asset ID when a logo should be applied
 - `template_file_id`: confirmed uploaded PPTX/PDF custom-template asset ID; valid only with `slide_mode=image`
 
@@ -49,7 +49,11 @@ Notes:
 - `wait_for_job.py` returns the backend jobs payload. When `data.job` exists, use `data.job.status` as the terminal signal.
 - When `wait_for_job.py --download-to <directory>` is used, it prefers the backend job filename or the signed URL download hint before falling back to the URL path.
 - `slide_mode=image` only controls rendering mode. It does not automatically mean `output_format=pptx_image`.
-- In image mode, use `pptx_image` for pure image-based PPTX delivery and `pdf` for review handoff.
+- In image mode, choose `output_format` by delivery expectation:
+  - `pdf` for review or read-only handoff
+  - `pptx_image` for PPTX delivery when visual fidelity matters more than downstream editing
+  - `pptx` only when the user explicitly wants an editable PPTX
+- If the user asks for "PPTX" in image mode without specifying editability, prefer `pptx_image`.
 - `html_zip` is a valid export format only for HTML-mode decks.
 - `page_count_range` must be one of `4-8`, `8-12`, `12-16`, `16-20`, `20-30`, `30-40`, `40-50`, or `50-100`.
 - Source-file count and total source-page limits are enforced by backend tier policy; the current default/free fallback is `1` source file and `60` total source pages.

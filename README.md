@@ -81,8 +81,10 @@ If the generated deck will be re-uploaded through OpenClaw, WeChat, email, or an
 - keep `--slide-mode html` by default
 - use `--slide-mode image` only when the user explicitly wants image-mode rendering or image-first slide composition
 - when using image mode, pass `--image-model` if the user cares about image quality or regeneration consistency
-- use `--output-format pptx_image` when the user wants a pure image-based PPTX export
-- use `--output-format pdf` for image-mode review handoff
+- in image mode, use `--output-format pdf` for review or read-only handoff
+- in image mode, use `--output-format pptx_image` when the user wants a PPTX deliverable that should preserve the generated visuals as-is
+- in image mode, use `--output-format pptx` only when the user explicitly wants an editable PPTX
+- if the user asks for "PPTX" in image mode without clarifying editability, prefer `pptx_image`
 - do not use `--output-format html_zip` for image-mode decks
 
 Then call:
