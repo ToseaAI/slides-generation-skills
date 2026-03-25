@@ -33,15 +33,24 @@ Recommended defaults:
 - `render_model`: `gemini-3.1-pro-preview` for quality-sensitive work
 - `slide_mode`: `html` unless the user explicitly wants image mode
 - `output_format`: `pptx` for editable decks, `pdf` for review handoff
+- `output_format`: `pptx_image` when an image-mode deck must be delivered as a pure image-based PPTX
+- `logo_file_id`: confirmed uploaded logo asset ID when a logo should be applied
+- `template_file_id`: confirmed uploaded PPTX/PDF custom-template asset ID; valid only with `slide_mode=image`
 
 Notes:
 
 - `upload_files.py` follows the same three-step upload pattern as the web app and returns reusable `file_ids`.
 - `upload_files.py`, `parse_pdf.py`, and `pdf_to_presentation.py` accept `--manifest <utf8-json>` for Windows/OpenClaw-safe path handling.
 - `pdf_to_presentation.py` and `export_presentation.py` accept `--export-filename` when the user cares about the visible exported attachment name.
+- `logo_file_id` and `template_file_id` are asset IDs, not source-document paths.
+- Do not pass the template PPTX/PDF as a source file for generation; upload it separately and pass `template_file_id`.
 - `pdf_to_presentation.py`, `parse_pdf.py`, `edit_outline_page.py`, `edit_slide_page.py`, and `export_presentation.py` should receive explicit `idempotency_key` values.
 - `render_slides.py` is asynchronous but does not currently take `idempotency_key`; use job polling instead of repeated blind retries.
 - `wait_for_job.py` returns the backend jobs payload. When `data.job` exists, use `data.job.status` as the terminal signal.
 - When `wait_for_job.py --download-to <directory>` is used, it prefers the backend job filename or the signed URL download hint before falling back to the URL path.
+- `slide_mode=image` only controls rendering mode. It does not automatically mean `output_format=pptx_image`.
+- In image mode, use `pptx_image` for pure image-based PPTX delivery and `pdf` for review handoff.
 - `html_zip` is a valid export format only for HTML-mode decks.
+- `page_count_range` must be one of `4-8`, `8-12`, `12-16`, `16-20`, `20-30`, `30-40`, `40-50`, or `50-100`.
+- Source-file count and total source-page limits are enforced by backend tier policy; the current default/free fallback is `1` source file and `60` total source pages.
 - If the host already has a healthy `tosea` MCP server, the same operations can be mirrored through MCP, but that mode is optional.

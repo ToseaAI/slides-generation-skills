@@ -49,40 +49,71 @@ Choose staged when:
 
 Read `references/mcp-tools.md` only if you need the full script-to-endpoint map.
 
+## Image-mode decision rule
+
+- Keep `--slide-mode html` unless the user explicitly asks for image-mode rendering, image-first composition, template-driven image generation, or image-only visual consistency.
+- If you use `--slide-mode image`, pass `--image-model` when the user cares about image quality or consistent image regeneration.
+- `--slide-mode image` does not automatically imply `--output-format pptx_image`.
+- Use `--output-format pptx_image` when the user specifically wants a pure image-based PPTX export.
+- Use `--output-format pdf` when the user wants a review artifact from an image-mode deck.
+- Do not use `--output-format html_zip` for image-mode decks.
+
+## Asset file_id rule
+
+- `--logo-file-id` is the confirmed uploaded `file_id` for a logo asset. It is not a local path.
+- `--template-file-id` is the confirmed uploaded `file_id` for a PPTX/PDF custom-template asset. It is not a source document path.
+- Only use `--template-file-id` with `--slide-mode image`.
+- Do not put the template PPTX/PDF into `--file`; upload it separately and pass its `file_id`.
+- When `--template-file-id` is present, the backend treats the request as `custom_template` automatically.
+
+## Upload constraints
+
+- `--page-count-range` must be one of `4-8`, `8-12`, `12-16`, `16-20`, `20-30`, `30-40`, `40-50`, or `50-100`.
+- Source-file count and total source-page limits are enforced by backend tier policy.
+- The current default/free backend policy is `1` source file and `60` total source pages unless server-side policy overrides it.
+
 ## One-shot workflow
 
 1. Generate a request key with `python scripts/make_idempotency_key.py --prefix oneshot`.
 2. First upload through the product upload system with `python scripts/upload_files.py --file <path> [--file <path>]` if you need explicit upload records or reusable `file_ids`.
    On Windows/OpenClaw, prefer `python scripts/upload_files.py --manifest ./sources.json`.
-3. Call `python scripts/pdf_to_presentation.py --file <path> [--file <path>] --instruction "<text>" --output-format pptx --idempotency-key <key>`.
+3. Upload logo or template assets separately when needed, then keep their returned `file_id` values for `--logo-file-id` or `--template-file-id`.
+4. Call `python scripts/pdf_to_presentation.py --file <path> [--file <path>] --instruction "<text>" --output-format pptx --idempotency-key <key>`.
    Add `--export-filename "<name>.pptx"` when the user cares about the final attachment name.
-4. Save `presentation_id` from `response.data.presentation_id`.
-5. Poll with `python scripts/wait_for_job.py --presentation-id <id>`.
-6. If the job completes and exposes `download_url`, save it with an explicit file path when the final filename matters, for example `--download-to ./board_update_final.pptx`.
-7. If the user also needs PDF, generate a new key and call `python scripts/export_presentation.py --presentation-id <id> --output-format pdf --idempotency-key <key> [--export-filename "<name>.pdf"]`, then poll again.
-8. Optionally inspect exports with `python scripts/list_export_files.py --presentation-id <id>`.
+   Only add `--slide-mode image [--image-model <model>]` when the user explicitly wants image mode. If the user wants an image-based PPTX deliverable, use `--output-format pptx_image`.
+   Add `--logo-file-id <id>` when a confirmed uploaded logo asset should be applied.
+   Add `--template-file-id <id>` only for image-mode custom-template runs.
+5. Save `presentation_id` from `response.data.presentation_id`.
+6. Poll with `python scripts/wait_for_job.py --presentation-id <id>`.
+7. If the job completes and exposes `download_url`, save it with an explicit file path when the final filename matters, for example `--download-to ./board_update_final.pptx`.
+8. If the user also needs PDF, generate a new key and call `python scripts/export_presentation.py --presentation-id <id> --output-format pdf --idempotency-key <key> [--export-filename "<name>.pdf"]`, then poll again.
+9. Optionally inspect exports with `python scripts/list_export_files.py --presentation-id <id>`.
 
 ## Staged workflow
 
 1. Generate a request key with `python scripts/make_idempotency_key.py --prefix parse`.
 2. First upload through the product upload system with `python scripts/upload_files.py --file <path> [--file <path>]` if you need explicit upload records or reusable `file_ids`.
    On Windows/OpenClaw, prefer `python scripts/upload_files.py --manifest ./sources.json`.
-3. Call `python scripts/parse_pdf.py --file <path> [--file <path>] --instruction "<text>" --idempotency-key <key>`.
-4. Poll with `python scripts/wait_for_job.py --presentation-id <id>`.
-5. Call `python scripts/generate_outline.py --presentation-id <id> --instruction "<text>"`.
-6. Poll again.
-7. For outline revisions, generate a new key and call `python scripts/edit_outline_page.py --presentation-id <id> --page-number <n> --action modify|insert --instruction "<text>" --idempotency-key <key> [--after-slide <n>]`.
-8. Render with `python scripts/render_slides.py --presentation-id <id> [--render-model gemini-3.1-pro-preview] [--image-model <model>] [--force]`.
-9. Poll again.
-10. For slide revisions, generate a new key and call `python scripts/edit_slide_page.py --presentation-id <id> --page-number <n> --action modify|insert --instruction "<text>" --edit-mode outline_layout|layout_only --idempotency-key <key> [--after-slide <n>] [--image-model <model>] [--screenshot-path <path>] [--screenshot-base64 <value>]`.
-11. Export with `python scripts/export_presentation.py --presentation-id <id> --output-format pptx --idempotency-key <key> [--export-filename "<name>.pptx"]`, then poll and optionally export PDF the same way.
-12. Use `python scripts/get_full_data.py --presentation-id <id>` whenever you need the current outline, slides, or speaker notes context.
+3. Upload logo or template assets separately when needed, then keep their returned `file_id` values for `--logo-file-id` or `--template-file-id`.
+4. Call `python scripts/parse_pdf.py --file <path> [--file <path>] --instruction "<text>" --idempotency-key <key>`.
+   Add `--logo-file-id <id>` when a confirmed uploaded logo asset should be applied.
+   Add `--template-file-id <id>` only for image-mode custom-template runs.
+5. Poll with `python scripts/wait_for_job.py --presentation-id <id>`.
+6. Call `python scripts/generate_outline.py --presentation-id <id> --instruction "<text>"`.
+7. Poll again.
+8. For outline revisions, generate a new key and call `python scripts/edit_outline_page.py --presentation-id <id> --page-number <n> --action modify|insert --instruction "<text>" --idempotency-key <key> [--after-slide <n>]`.
+9. Render with `python scripts/render_slides.py --presentation-id <id> [--render-model gemini-3.1-pro-preview] [--image-model <model>] [--force]`.
+10. Poll again.
+11. For slide revisions, generate a new key and call `python scripts/edit_slide_page.py --presentation-id <id> --page-number <n> --action modify|insert --instruction "<text>" --edit-mode outline_layout|layout_only --idempotency-key <key> [--after-slide <n>] [--image-model <model>] [--screenshot-path <path>] [--screenshot-base64 <value>]`.
+12. Export with `python scripts/export_presentation.py --presentation-id <id> --output-format pptx --idempotency-key <key> [--export-filename "<name>.pptx"]`, then poll and optionally export PDF the same way.
+13. Use `python scripts/get_full_data.py --presentation-id <id>` whenever you need the current outline, slides, or speaker notes context.
 
 ## Script defaults
 
 - Prefer `--render-model gemini-3.1-pro-preview` for quality-sensitive decks.
 - Prefer `--slide-mode html` unless the user explicitly wants image mode.
 - Use `--output-format pptx` for editable decks and `--output-format pdf` for review handoff.
+- Use `--output-format pptx_image` when an image-mode deck must be delivered as a pure image-based PPTX.
 - Use `--output-format html_zip` only for HTML-mode decks.
 - Pass `--image-model` only when the user explicitly asks for image quality or image-mode consistency.
 - When a downstream chat client or relay layer cares about the visible attachment name, pass `--export-filename` and save with an explicit `--download-to` filename.

@@ -27,6 +27,16 @@ def main() -> int:
     parser.add_argument("--slide-domain", default="general")
     parser.add_argument("--page-count-range", default="8-12")
     parser.add_argument("--template-name", default="beamer_classic")
+    parser.add_argument(
+        "--logo-file-id",
+        default=None,
+        help="Confirmed uploaded logo file_id. Do not pass a local path.",
+    )
+    parser.add_argument(
+        "--template-file-id",
+        default=None,
+        help="Confirmed uploaded PPTX/PDF custom-template file_id. Requires --slide-mode image.",
+    )
     parser.add_argument("--slide-mode", default="html", help="html or image.")
     parser.add_argument("--image-model", default=None)
     parser.add_argument(
@@ -58,6 +68,8 @@ def main() -> int:
         "slide_domain": args.slide_domain,
         "page_count_range": args.page_count_range,
         "template_name": args.template_name,
+        "logo_file_id": args.logo_file_id,
+        "template_file_id": args.template_file_id,
         "slide_mode": args.slide_mode,
         "image_model": args.image_model,
         "export_filename": args.export_filename,

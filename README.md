@@ -62,11 +62,42 @@ If the generated deck will be re-uploaded through OpenClaw, WeChat, email, or an
 - preserve filename, extension, and `Content-Type` when relaying the downloaded file
 - do not repackage the file as an anonymous binary attachment, or downstream clients may show only a generic attachment label
 
+## Asset file_id inputs
+
+- `--logo-file-id` is the confirmed uploaded `file_id` for a logo asset. It is not a local path.
+- `--template-file-id` is the confirmed uploaded `file_id` for a PPTX/PDF custom-template asset. It is not a source document path.
+- `--template-file-id` is valid only with `--slide-mode image`.
+- When `--template-file-id` is present, the backend treats the request as `custom_template` automatically.
+- Do not upload a template PPTX/PDF through `--file` for generation. Upload it separately and pass the returned `file_id`.
+
+## Upload constraints
+
+- `--page-count-range` must be one of `4-8`, `8-12`, `12-16`, `16-20`, `20-30`, `30-40`, `40-50`, or `50-100`.
+- Source-file count and total source-page limits are enforced by backend tier policy.
+- The current default/free backend policy is `1` source file and `60` total source pages unless server-side policy overrides it.
+
+## Image mode decision rule
+
+- keep `--slide-mode html` by default
+- use `--slide-mode image` only when the user explicitly wants image-mode rendering or image-first slide composition
+- when using image mode, pass `--image-model` if the user cares about image quality or regeneration consistency
+- use `--output-format pptx_image` when the user wants a pure image-based PPTX export
+- use `--output-format pdf` for image-mode review handoff
+- do not use `--output-format html_zip` for image-mode decks
+
 Then call:
 
 ```bash
 python scripts/upload_files.py --manifest ./sources.json
 python scripts/pdf_to_presentation.py --manifest ./sources.json --instruction "Create a crisp 6-slide investor update." --output-format pptx --render-model gemini-3.1-pro-preview --idempotency-key <value>
+```
+
+Custom-template image mode:
+
+```bash
+python scripts/upload_files.py --file ./brand-logo.png
+python scripts/upload_files.py --file ./custom-template.pptx
+python scripts/pdf_to_presentation.py --manifest ./sources.json --instruction "Create an 8-slide research deck." --slide-mode image --template-file-id <template_file_id> --logo-file-id <logo_file_id> --output-format pptx_image --export-filename research_deck_image.pptx --idempotency-key <value>
 ```
 
 ## Typical use
