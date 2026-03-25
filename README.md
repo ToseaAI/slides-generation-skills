@@ -1,156 +1,94 @@
 # `slides-generation-skills`
 
-Official ToseaAI skill package for scripts-first document-to-presentation workflows.
+Official ToseaAI skill package for turning documents into polished presentations.
 
-This repository is intentionally separate from both the product backend and the optional MCP server:
+This repository teaches AI agents how to use ToseaAI's document-to-presentation pipeline through local Python scripts. It is intentionally separate from both the [product backend](https://tosea.ai) and the optional [MCP server](https://github.com/ToseaAI/mcp-ToseaAI).
 
-- the backend remains the system of record for auth, billing, quota, storage, and exports
-- this repo provides `SKILL.md` plus local scripts that call `/api/mcp/v1`
-- the `mcp-ToseaAI` repository remains an optional transport for hosts that already support MCP well
+## What's in this repo
 
-## What this repo contains
+| Path | Purpose |
+|------|---------|
+| `SKILL.md` | Agent-facing workflow guide — the only file agents need to read |
+| `scripts/` | Thin Python CLI wrappers calling the ToseaAI `/api/mcp/v1` HTTP API |
+| `references/` | Endpoint mapping and operating model notes |
+| `examples/` | Copy-paste workflow examples and manifest samples |
+| `agents/openai.yaml` | OpenAI-compatible skill metadata |
 
-- `SKILL.md`: workflow policy for the agent
-- `scripts/`: thin Python entrypoints that call the public `/api/mcp/v1` HTTP contract, including the three-step upload flow used by the web app
-- `references/`: compact notes on transport, billing, and endpoint mapping
-- `examples/`: one-shot and staged command examples
-- `agents/openai.yaml`: metadata for OpenAI-compatible skill packaging
+## Setup
 
-## Default runtime
-
-This skill is scripts-first. It does not require MCP.
-
-Required environment variables:
+### 1. Environment variables
 
 ```bash
 export TOSEA_API_KEY="sk_..."
-export TOSEA_API_BASE_URL="https://your-tosea-backend.example.com"
 ```
 
-Windows PowerShell:
+Get your API key at **https://tosea.ai** → Settings → Developers.
 
-```powershell
-$env:TOSEA_API_KEY="sk_..."
-$env:TOSEA_API_BASE_URL="https://your-tosea-backend.example.com"
-```
-
-## Windows and OpenClaw path safety
-
-On Windows hosts, especially OpenClaw-style shell execution, raw non-ASCII file paths can be mangled before Python receives them. To avoid that:
-
-- prefer a UTF-8 manifest file via `--manifest`
-- or copy source files to an ASCII-only staging directory such as `C:\tosea-inputs\`
-
-Manifest example:
-
-```json
-{
-  "files": [
-    "C:\\tosea-inputs\\source.pdf",
-    "C:\\tosea-inputs\\source.docx"
-  ]
-}
-```
-
-Reference file: [examples/source-manifest.example.json](examples/source-manifest.example.json)
-
-## Attachment delivery safety
-
-If the generated deck will be re-uploaded through OpenClaw, WeChat, email, or another relay layer:
-
-- pass `--export-filename` when the user cares about the final visible attachment name
-- preserve filename, extension, and `Content-Type` when relaying the downloaded file
-- do not repackage the file as an anonymous binary attachment, or downstream clients may show only a generic attachment label
-
-## Asset file_id inputs
-
-- `--logo-file-id` is the confirmed uploaded `file_id` for a logo asset. It is not a local path.
-- `--template-file-id` is the confirmed uploaded `file_id` for a PPTX/PDF custom-template asset. It is not a source document path.
-- `--template-file-id` is valid only with `--slide-mode image`.
-- When `--template-file-id` is present, the backend treats the request as `custom_template` automatically.
-- Do not upload a template PPTX/PDF through `--file` for generation. Upload it separately and pass the returned `file_id`.
-
-## Upload constraints
-
-- `--page-count-range` must be one of `4-8`, `8-12`, `12-16`, `16-20`, `20-30`, `30-40`, `40-50`, or `50-100`.
-- Source-file count and total source-page limits are enforced by backend tier policy.
-- The current default/free backend policy is `1` source file and `60` total source pages unless server-side policy overrides it.
-
-## Image mode decision rule
-
-- keep `--slide-mode html` by default
-- use `--slide-mode image` only when the user explicitly wants image-mode rendering or image-first slide composition
-- when using image mode, pass `--image-model` if the user cares about image quality or regeneration consistency
-- in image mode, use `--output-format pdf` for review or read-only handoff
-- in image mode, use `--output-format pptx_image` when the user wants a PPTX deliverable that should preserve the generated visuals as-is
-- in image mode, use `--output-format pptx` only when the user explicitly wants an editable PPTX
-- if the user asks for "PPTX" in image mode without clarifying editability, prefer `pptx_image`
-- do not use `--output-format html_zip` for image-mode decks
-
-Then call:
+To point at a non-production server (for testing):
 
 ```bash
-python scripts/upload_files.py --manifest ./sources.json
-python scripts/pdf_to_presentation.py --manifest ./sources.json --instruction "Create a crisp 6-slide investor update." --output-format pptx --render-model gemini-3.1-pro-preview --idempotency-key <value>
+export TOSEA_API_BASE_URL="https://your-test-server.example.com"
 ```
 
-Custom-template image mode:
+When unset, scripts default to `https://tosea.ai`.
 
-```bash
-python scripts/upload_files.py --file ./brand-logo.png
-python scripts/upload_files.py --file ./custom-template.pptx
-python scripts/pdf_to_presentation.py --manifest ./sources.json --instruction "Create an 8-slide research deck." --slide-mode image --template-file-id <template_file_id> --logo-file-id <logo_file_id> --output-format pptx_image --export-filename research_deck_image.pptx --idempotency-key <value>
-```
-
-## Typical use
-
-Health check:
+### 2. Verify
 
 ```bash
 python scripts/health.py
 python scripts/get_permissions_summary.py
-python scripts/get_quota_status.py
 ```
 
-One-shot:
+No external dependencies — scripts use only the Python standard library.
+
+## Install as a skill
+
+**Codex:**
 
 ```bash
-python scripts/upload_files.py --file ./deck-source.pdf --file ./deck-source.docx
-# Windows/OpenClaw alternative:
-# python scripts/upload_files.py --manifest ./sources.json
-python scripts/make_idempotency_key.py --prefix one-shot
-python scripts/pdf_to_presentation.py --file ./deck-source.pdf --file ./deck-source.docx --instruction "Create a crisp 6-slide investor update." --output-format pptx --export-filename investor_update_final.pptx --render-model gemini-3.1-pro-preview --idempotency-key <value>
-# Windows/OpenClaw alternative:
-# python scripts/pdf_to_presentation.py --manifest ./sources.json --instruction "Create a crisp 6-slide investor update." --output-format pptx --export-filename investor_update_final.pptx --render-model gemini-3.1-pro-preview --idempotency-key <value>
-python scripts/wait_for_job.py --presentation-id <presentation_id> --download-to ./investor_update_final.pptx
+git clone git@github.com:ToseaAI/slides-generation-skills.git ~/.codex/skills/tosea-slides
 ```
 
-Staged:
+**Claude Code / Cursor:**
+
+Clone the repo alongside your project and reference `SKILL.md` from your project instructions or MCP config.
+
+**Manual / standalone:**
+
+The scripts work without any agent framework. Just set the env vars and run them directly.
+
+## Quick example
 
 ```bash
-python scripts/upload_files.py --file ./deck-source.pdf --file ./deck-source.docx
-# Windows/OpenClaw alternative:
-# python scripts/upload_files.py --manifest ./sources.json
-python scripts/make_idempotency_key.py --prefix parse
-python scripts/parse_pdf.py --file ./deck-source.pdf --file ./deck-source.docx --instruction "Create a 6-slide operating review." --render-model gemini-3.1-pro-preview --idempotency-key <value>
-# Windows/OpenClaw alternative:
-# python scripts/parse_pdf.py --manifest ./sources.json --instruction "Create a 6-slide operating review." --render-model gemini-3.1-pro-preview --idempotency-key <value>
-python scripts/wait_for_job.py --presentation-id <presentation_id>
-python scripts/generate_outline.py --presentation-id <presentation_id> --instruction "Emphasize risks, mitigations, and owners."
-python scripts/edit_outline_page.py --presentation-id <presentation_id> --page-number 2 --action modify --instruction "Make this page a sharper executive summary." --idempotency-key <value>
-python scripts/render_slides.py --presentation-id <presentation_id> --render-model gemini-3.1-pro-preview --force
-python scripts/edit_slide_page.py --presentation-id <presentation_id> --page-number 2 --action modify --instruction "Use fewer bullets and a stronger title." --edit-mode layout_only --idempotency-key <value>
-python scripts/export_presentation.py --presentation-id <presentation_id> --output-format pptx --export-filename staged_review_final.pptx --idempotency-key <value>
-python scripts/wait_for_job.py --presentation-id <presentation_id> --download-to ./staged_review_final.pptx
+python scripts/make_idempotency_key.py --prefix oneshot
+python scripts/upload_files.py --file ./report.pdf
+python scripts/pdf_to_presentation.py \
+  --file ./report.pdf \
+  --instruction "Create a 10-slide summary." \
+  --output-format pptx \
+  --idempotency-key <key>
+python scripts/wait_for_job.py --presentation-id <id> --download-to ./output.pptx
 ```
 
-## Optional MCP pairing
-
-If the host already has a configured `tosea` MCP server, the same workflow can be mirrored through MCP tools. That is optional. The local scripts remain the default execution layer for Claude-style skills.
+For staged workflows with outline editing, see `examples/staged-workflow.md`.
 
 ## Validate and package
+
+Before publishing a new skill release:
 
 ```bash
 python scripts/validate_skill.py
 python scripts/package_skill.py --version 0.1.0
 ```
+
+The packager creates a zip in `dist/` containing `SKILL.md`, scripts, references, examples, and metadata.
+
+## Repository separation
+
+- **This repo** — workflow policy + scripts (what agents read and run)
+- **mcp-ToseaAI** — optional stdio MCP transport (for hosts that prefer MCP over direct scripts)
+- **ToseaAI backend** — the system of record for auth, billing, quota, storage, and exports
+
+## License
+
+MIT — see [LICENSE](LICENSE).

@@ -1,42 +1,91 @@
 # Example: Staged Workflow
 
-1. Upload and parse with a fresh request key:
+Full control over outline and slides with edit checkpoints.
+
+## 1. Parse the source document
 
 ```bash
-python scripts/upload_files.py --file ./source.pdf --file ./source.docx
-python scripts/upload_files.py --manifest ./sources.json  # Windows/OpenClaw alternative
 python scripts/make_idempotency_key.py --prefix parse
-python scripts/parse_pdf.py --file ./source.pdf --file ./source.docx --instruction "Create a 6-slide operating review." --render-model gemini-3.1-pro-preview --idempotency-key <idempotency_key>
-python scripts/parse_pdf.py --manifest ./sources.json --instruction "Create a 6-slide operating review." --render-model gemini-3.1-pro-preview --idempotency-key <idempotency_key>  # Windows/OpenClaw alternative
-python scripts/wait_for_job.py --presentation-id <presentation_id>
+python scripts/upload_files.py --file ./quarterly-report.pdf
+
+python scripts/parse_pdf.py \
+  --file ./quarterly-report.pdf \
+  --instruction "Create a 12-slide board presentation." \
+  --template-name strategy_navy \
+  --slide-domain business \
+  --idempotency-key <key>
+
+python scripts/wait_for_job.py --presentation-id <id>
 ```
 
-2. Generate and revise outline:
+On Windows with non-ASCII paths, use `--manifest ./sources.json` instead of `--file`.
+
+## 2. Generate outline
 
 ```bash
-python scripts/generate_outline.py --presentation-id <presentation_id> --instruction "Emphasize executive summary, risks, and owners."
-python scripts/wait_for_job.py --presentation-id <presentation_id>
-python scripts/make_idempotency_key.py --prefix outline-edit
-python scripts/edit_outline_page.py --presentation-id <presentation_id> --page-number 2 --action modify --instruction "Make this page a sharper executive summary." --idempotency-key <idempotency_key>
+python scripts/generate_outline.py \
+  --presentation-id <id> \
+  --instruction "Emphasize revenue growth, risks, and next quarter priorities."
+
+python scripts/wait_for_job.py --presentation-id <id>
 ```
 
-3. Render and revise slides:
+## 3. Edit outline (optional)
 
 ```bash
-python scripts/render_slides.py --presentation-id <presentation_id> --render-model gemini-3.1-pro-preview --force
-python scripts/wait_for_job.py --presentation-id <presentation_id>
-python scripts/make_idempotency_key.py --prefix slide-edit
-python scripts/edit_slide_page.py --presentation-id <presentation_id> --page-number 2 --action modify --instruction "Use a stronger title and fewer bullets." --edit-mode layout_only --idempotency-key <idempotency_key>
+python scripts/make_idempotency_key.py --prefix outline
+python scripts/edit_outline_page.py \
+  --presentation-id <id> \
+  --page-number 2 \
+  --action modify \
+  --instruction "Sharpen this into a crisp executive summary." \
+  --idempotency-key <key>
 ```
 
-4. Export:
+## 4. Render slides
+
+```bash
+python scripts/render_slides.py --presentation-id <id>
+python scripts/wait_for_job.py --presentation-id <id>
+```
+
+## 5. Edit slides (optional)
+
+```bash
+python scripts/make_idempotency_key.py --prefix slide
+python scripts/edit_slide_page.py \
+  --presentation-id <id> \
+  --page-number 4 \
+  --action modify \
+  --instruction "Replace the bullet list with a comparison table." \
+  --edit-mode layout_only \
+  --idempotency-key <key>
+```
+
+## 6. Export
 
 ```bash
 python scripts/make_idempotency_key.py --prefix xp
-python scripts/export_presentation.py --presentation-id <presentation_id> --output-format pptx --export-filename staged_review_final.pptx --idempotency-key <idempotency_key>
-python scripts/wait_for_job.py --presentation-id <presentation_id> --download-to ./staged_review_final.pptx
+python scripts/export_presentation.py \
+  --presentation-id <id> \
+  --output-format pptx \
+  --idempotency-key <key>
+
+python scripts/wait_for_job.py \
+  --presentation-id <id> \
+  --download-to ./board_presentation.pptx
 ```
 
-Use this path when the user asks for outline changes, inserted slides, or iteration after review.
+## Inspect at any point
 
-For the export step, use nested `data.job.status` from the jobs payload when present. If the file will be relayed through OpenClaw, WeChat, email, or another chat surface, preserve filename, extension, and MIME metadata.
+```bash
+python scripts/get_full_data.py --presentation-id <id>
+```
+
+Returns the current outline, slide content, and speaker notes.
+
+## What to report back
+
+- `presentation_id`
+- Final job status (check `data.job.status` when present)
+- Filename and download URL
