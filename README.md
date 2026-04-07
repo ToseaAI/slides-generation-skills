@@ -72,6 +72,25 @@ python scripts/wait_for_job.py --presentation-id <id> --download-to ./output.ppt
 
 For staged workflows with outline editing, see `examples/staged-workflow.md`.
 
+For post-generation template switching on an existing presentation, use
+`python scripts/switch_template.py --presentation-id <id> --template-name beamer_classic`
+or swap in `--user-template-id` / `--system-template-key`.
+
+For standalone Markdown extraction, use the document-parse flow:
+
+```bash
+python scripts/make_idempotency_key.py --prefix docparse
+python scripts/upload_files.py --file ./report.pdf
+python scripts/create_document_parse.py \
+  --file ./report.pdf \
+  --instruction "Extract faithful Markdown and keep image references." \
+  --idempotency-key <key>
+python scripts/wait_for_job.py --document-parse-id <id>
+python scripts/get_parse_result.py --document-parse-id <id> --save-markdown-to ./report.md
+```
+
+This standalone flow still uses the backend's existing billing, quota, and access checks. It returns a `document_parse_id` facade while the backend reuses the internal presentation pipeline.
+
 ## Validate and package
 
 Before publishing a new skill release:

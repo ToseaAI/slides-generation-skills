@@ -20,6 +20,10 @@ DEFAULT_BASE_URL = "https://tosea.ai"
 DEFAULT_TIMEOUT_SECONDS = 180
 MCP_PREFIX = "/api/mcp/v1"
 TERMINAL_STATUSES = {"completed", "failed", "cancelled"}
+SKILL_CLIENT_NAME = os.getenv("TOSEA_CLIENT_NAME", "tosea-slides-skill")
+SKILL_CLIENT_VERSION = os.getenv("TOSEA_CLIENT_VERSION", "0.1.0")
+SKILL_CLIENT_SESSION_ID = os.getenv("TOSEA_CLIENT_SESSION_ID") or str(uuid.uuid4())
+SKILL_INVOCATION_ID = os.getenv("TOSEA_INVOCATION_ID") or str(uuid.uuid4())
 
 
 @dataclass
@@ -320,18 +324,31 @@ def _build_headers(
     *,
     api_key: str | None,
     idempotency_key: str | None,
+    operation_name: str | None = None,
     content_type: str | None = None,
+    presentation_id: str | None = None,
 ) -> dict[str, str]:
     headers = {
         "Accept": "application/json",
         "User-Agent": "tosea-slides-skill/0.1.0",
+        "X-Tosea-Client-Channel": "skill",
+        "X-Tosea-Client-Name": SKILL_CLIENT_NAME,
+        "X-Tosea-Client-Version": SKILL_CLIENT_VERSION,
+        "X-Tosea-Client-Session-ID": SKILL_CLIENT_SESSION_ID,
+        "X-Tosea-Invocation-ID": SKILL_INVOCATION_ID,
+        "X-Tosea-Operation-Name": operation_name or "skill_request",
     }
+    client_trace_id = os.getenv("TOSEA_CLIENT_TRACE_ID")
+    if client_trace_id:
+        headers["X-Tosea-Client-Trace-ID"] = client_trace_id
     if api_key:
         headers["Authorization"] = f"Bearer {api_key}"
     if idempotency_key:
         headers["X-Idempotency-Key"] = idempotency_key
     if content_type:
         headers["Content-Type"] = content_type
+    if presentation_id:
+        headers["X-Presentation-ID"] = presentation_id
     return headers
 
 
@@ -381,6 +398,7 @@ def request_json(
     form_fields: dict[str, str] | None = None,
     file_fields: list[tuple[str, Path]] | None = None,
     idempotency_key: str | None = None,
+    operation_name: str | None = None,
     base_url: str | None = None,
     timeout_seconds: int | None = None,
 ) -> dict[str, Any]:
@@ -396,9 +414,13 @@ def request_json(
 
     data: bytes | None = None
     content_type: str | None = None
+    presentation_id: str | None = None
     if json_body is not None:
         data = json.dumps(json_body).encode("utf-8")
         content_type = "application/json"
+        raw_presentation_id = json_body.get("presentation_id")
+        if isinstance(raw_presentation_id, str) and raw_presentation_id.strip():
+            presentation_id = raw_presentation_id.strip()
     elif form_fields is not None or file_fields is not None:
         data, content_type = _encode_multipart(
             form_fields=form_fields,
@@ -411,7 +433,9 @@ def request_json(
         headers=_build_headers(
             api_key=api_key,
             idempotency_key=idempotency_key,
+            operation_name=operation_name or _derive_operation_name(method, path),
             content_type=content_type,
+            presentation_id=presentation_id,
         ),
         method=method.upper(),
     )
@@ -507,6 +531,12 @@ def upload_file_to_signed_url(*, signed_url: str, file_path: Path) -> None:
             detail={"error": "transport_error", "retryable": True},
             path="signed_url_upload",
         ) from exc
+
+
+def _derive_operation_name(method: str, path: str) -> str:
+    normalized = path.strip().strip("/").replace("-", "_").replace("/", "_")
+    normalized = normalized or "root"
+    return f"{method.lower()}_{normalized}"
 
 
 def request_upload_credentials(

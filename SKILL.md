@@ -184,6 +184,12 @@ Pass as `--slide-domain`. Default is `general`.
 
 ## One-shot workflow
 
+Before choosing a command, separate two parse-related intents:
+
+- Use `parse_pdf.py` when the user is starting the staged presentation workflow and will continue with outline generation or slide rendering.
+- Use `create_document_parse.py` when the user wants Markdown, extracted image URLs, or parse metadata without entering the presentation workflow.
+- The standalone document-parse flow still consumes parse credits and still respects the same upload and plan limits.
+
 ```bash
 python scripts/make_idempotency_key.py --prefix oneshot
 python scripts/upload_files.py --file ./source.pdf
@@ -233,6 +239,11 @@ python scripts/edit_outline_page.py \
 python scripts/render_slides.py --presentation-id <id>
 python scripts/wait_for_job.py --presentation-id <id>
 
+# Switch the template after generation if needed:
+python scripts/switch_template.py \
+  --presentation-id <id> --template-name executive_platinum
+python scripts/wait_for_job.py --presentation-id <new-id>
+
 # Edit a specific slide if needed:
 python scripts/make_idempotency_key.py --prefix slide
 python scripts/edit_slide_page.py \
@@ -248,6 +259,26 @@ python scripts/wait_for_job.py --presentation-id <id> --download-to ./final.pptx
 ```
 
 Use `python scripts/get_full_data.py --presentation-id <id>` at any point to inspect the current outline, slides, and speaker notes.
+For template switching, provide exactly one of `--template-name`, `--user-template-id`, or `--system-template-key`.
+
+## Standalone document parse workflow
+
+Use this when the user wants a reusable Markdown extraction result instead of a presentation workflow.
+
+```bash
+python scripts/make_idempotency_key.py --prefix docparse
+python scripts/upload_files.py --file ./source.pdf
+python scripts/create_document_parse.py \
+  --file ./source.pdf \
+  --instruction "Extract faithful Markdown and keep figure references." \
+  --idempotency-key <key>
+python scripts/wait_for_job.py --document-parse-id <id>
+python scripts/get_parse_result.py \
+  --document-parse-id <id> \
+  --save-markdown-to ./parsed.md
+```
+
+This flow returns `document_parse_id`, combined `markdown_content`, per-file parse payloads, and extracted image URLs. Treat it as a document-analysis resource, not as a `presentation_id`.
 
 ## Custom template workflow
 
